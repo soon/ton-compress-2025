@@ -1,0 +1,6 @@
+set -xe
+
+echo "#!/usr/bin/env bash\npython solution.py" > solution
+chmod +x solution
+python ./run_tests.py
+

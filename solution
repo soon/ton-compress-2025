@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+DYLD_LIBRARY_PATH=. ./executable

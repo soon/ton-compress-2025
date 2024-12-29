@@ -1,0 +1,5 @@
+/blocks/*
+.ipynb_checkpoints
+.DS_Store
+/lib
+*.dylib

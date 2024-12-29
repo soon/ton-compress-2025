@@ -1,0 +1,2 @@
+set -xe
+./run-macos.sh solution.cpp

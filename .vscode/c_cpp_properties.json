@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/g++",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-arm64",
+            "compilerArgs": [
+                "-O2",
+                "-std=c++17 ",
+                "-Iinclude",
+                "-Iinclude/crypto ",
+                "-Iinclude/tdutils ",
+                "-Iinclude/ton ",
+                "-Iinclude/common",
+                "-L. ",
+                "-lton_crypto_lib"
+            ]
+        }
+    ],
+    "version": 4
+}

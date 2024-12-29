@@ -1,0 +1,23 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Experimental",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/experimental.out", // Path to the executable
+      "args": [], // Arguments for the program
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {"name": "DYLD_LIBRARY_PATH", "value": "."}
+      ],
+      "externalConsole": false,
+      "MIMode": "lldb", // Use LLDB for macOS
+      "preLaunchTask": "build-experimental"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+set -xe
+
+rm -f ./executable ./solution.min.cpp
+./minify.py
+./compile.sh solution.min.cpp executable
+python ./run_tests.py
+wc solution.min.cpp

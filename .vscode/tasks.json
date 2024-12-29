@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-experimental", // Task name
+      "type": "shell",
+      "command": "g++", // Compiler
+      "args": [
+        "-g", // Debug symbols
+				"-std=c++17",
+				"-Iinclude",
+				"-Iinclude/crypto",
+				"-Iinclude/tdutils", 
+				"-Iinclude/ton", 
+				"-Iinclude/common",
+        "${workspaceFolder}/experimental.cpp", // Source file
+				"-L.",
+				"-lton_crypto_lib",
+				// "-lton_crypto",
+        "-o",
+        "${workspaceFolder}/experimental.out" // Output executable
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true // Makes it the default build task
+      },
+      "problemMatcher": ["$gcc"], // Error matching for diagnostics
+      "detail": "Compile C++ code"
+    }
+  ]
+}

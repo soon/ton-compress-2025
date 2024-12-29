@@ -1,0 +1,64 @@
+FullBlock.cell_unpack
+ FullBlockExtra.cell_unpack
+  FullInMsgDescr.cell_unpack
+   FullInMsgDescrX.unpack
+    FullHashmapAug.cell_unpack
+     FullHashmapAugNode.unpack fork
+      FullHashmapAug.cell_unpack
+       FullHashmapAugNode.unpack fork
+        FullHashmapAug.cell_unpack
+         FullHashmapAugNode.unpack fork
+          FullHashmapAug.cell_unpack
+           FullHashmapAugNode.unpack fork
+            FullHashmapAug.cell_unpack
+             FullHashmapAugNode.unpack fork
+              FullHashmapAug.cell_unpack
+               FullHashmapAugNode.unpack fork
+                FullHashmapAug.cell_unpack
+                 FullHashmapAugNode.unpack fork
+                  FullHashmapAug.cell_unpack
+[ 0][t 0][2024-12-28 15:26:56.997722][experimental.cpp:2977]    Check `type.unpack(cs, record)` failed
+
+
+ extra:(block_extra
+    in_msg_descr:(
+      (ahme_root
+        root:(ahm_edge
+          label:(hml_short
+            len:unary_zero s:x)
+          node:(ahmn_fork
+            left:(ahm_edge
+              label:(hml_short
+                len:unary_zero s:x)
+              node:(ahmn_fork
+                left:(ahm_edge
+                  label:(hml_short
+                    len:unary_zero s:x)
+                  node:(ahmn_fork
+                    left:(ahm_edge
+                      label:(hml_short
+                        len:unary_zero s:x)
+                      node:(ahmn_fork
+                        left:(ahm_edge
+                          label:(hml_short
+                            len:unary_zero s:x)
+                          node:(ahmn_fork
+                            left:(ahm_edge
+                              label:(hml_short
+                                len:unary_zero s:x)
+                              node:(ahmn_fork
+                                left:(ahm_edge
+                                  label:(hml_short
+                                    len:unary_zero s:x)
+                                  node:(ahmn_fork
+                                    left:(ahm_edge
+                                      label:(hml_long n:249 s:x88B909353C6F0E59DC611908961579B02D8CA0FCAE516532B231B3A6F0BE7BC_)
+                                      node:(ahmn_leaf
+                                        extra:(import_fees
+                                          fees_collected:(nanograms
+                                            amount:(var_uint len:3 value:406404))
+                                          value_imported:(currencies
+                                            grams:(nanograms
+                                              amount:(var_uint len:4 value:46085190))
+                                            other:(extra_currencies
+                                              dict:hme_empty)))

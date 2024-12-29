@@ -1,0 +1,4 @@
+set -xe
+
+./compile.sh solution.cpp executable
+python ./run_tests.py

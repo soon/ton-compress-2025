@@ -1,0 +1,7 @@
+-O2
+-std=c++17
+-Iinclude
+-Iinclude/crypto
+-Iinclude/tdutils
+-Iinclude/ton
+-Iinclude/common
