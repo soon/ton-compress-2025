@@ -1,3149 +1,1088 @@
+// minify-remove:start
 #define private public
+#define final
+#define FIXED_FLOAT(x) fixed <<setprecision(2)<<(x)
+// minify-remove:end
 
 #include <iostream>
 #include <sstream>
 #include "block/block-auto.h"
+#include "block/block-parse.h"
 #include "common/util.h"
 #include "vm/boc.h"
 #include "vm/cells/CellSlice.h"
 #include <fstream>
+#include <set>
 #include "td/utils/lz4.h"
+#include "td/utils/misc.h"
+#include "td/utils/buffer.h"
+#include "td/utils/misc.h"
+#include <stdio.h>
+#include <string>
+#include <vector>
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <algorithm>
 
-using vm::BagOfCells;
-using vm::Cell;
-using vm::CellSerializationInfo;
-using vm::DataCell;
-using vm::Ref;
+using namespace vm;
+using namespace std;
 
-namespace td
+CellSlice to_cs(Ref<Cell> cell)
 {
-	uint32 crc32c(Slice data);
+	// minify-remove
+	CHECK(!cell.is_null())
+	return load_cell_slice(move(cell));
 }
 
-// struct MyBagOfCells : public BagOfCells
-// {
-// 	td::Result<long long> deserialize(const td::Slice &data, int max_roots)
-// 	{
-// 		clear();
-// 		long long size_est = info.parse_serialized_header(data);
-// 		// LOG(INFO) << "estimated size " << size_est << ", true size " << data.size();
-// 		if (size_est == 0)
-// 		{
-// 			return td::Status::Error(PSLICE() << "cannot deserialize bag-of-cells: invalid header, error " << size_est);
-// 		}
-// 		if (size_est < 0)
-// 		{
-// 			// LOG(ERROR) << "cannot deserialize bag-of-cells: not enough bytes (" << data.size() << " present, " << -size_est
-// 			//<< " required)";
-// 			return size_est;
-// 		}
+struct ParseContext {
+	ostream& out;
 
-// 		if (size_est > (long long)data.size())
-// 		{
-// 			// LOG(ERROR) << "cannot deserialize bag-of-cells: not enough bytes (" << data.size() << " present, " << size_est
-// 			//<< " required)";
-// 			return -size_est;
-// 		}
-// 		// LOG(INFO) << "estimated size " << size_est << ", true size " << data.size();
-// 		if (info.root_count > max_roots)
-// 		{
-// 			return td::Status::Error("Bag-of-cells has more root cells than expected");
-// 		}
-// 		if (info.has_crc32c)
-// 		{
-// 			// unsigned crc_computed = td::crc32c(td::Slice{data.ubegin(), data.uend() - 4});
-// 			// unsigned crc_stored = td::as<unsigned>(data.uend() - 4);
-// 			// if (crc_computed != crc_stored)
-// 			// {
-// 			// 	return td::Status::Error(PSLICE() << "bag-of-cells CRC32C mismatch: expected " << td::format::as_hex(crc_computed)
-// 			// 																		<< ", found " << td::format::as_hex(crc_stored));
-// 			// }
-// 		}
-
-// 		cell_count = info.cell_count;
-// 		std::vector<td::uint8> cell_should_cache;
-// 		if (info.has_cache_bits)
-// 		{
-// 			cell_should_cache.resize(cell_count, 0);
-// 		}
-// 		roots.clear();
-// 		roots.resize(info.root_count);
-// 		auto *roots_ptr = data.substr(info.roots_offset).ubegin();
-// 		for (int i = 0; i < info.root_count; i++)
-// 		{
-// 			int idx = 0;
-// 			if (info.has_roots)
-// 			{
-// 				idx = (int)info.read_ref(roots_ptr + i * info.ref_byte_size);
-// 			}
-// 			if (idx < 0 || idx >= info.cell_count)
-// 			{
-// 				return td::Status::Error(PSLICE() << "bag-of-cells invalid root index " << idx);
-// 			}
-// 			roots[i].idx = info.cell_count - idx - 1;
-// 			if (info.has_cache_bits)
-// 			{
-// 				auto &cnt = cell_should_cache[idx];
-// 				if (cnt < 2)
-// 				{
-// 					cnt++;
-// 				}
-// 			}
-// 		}
-// 		if (info.has_index)
-// 		{
-// 			index_ptr = data.substr(info.index_offset).ubegin();
-// 			// TODO: should we validate index here
-// 		}
-// 		else
-// 		{
-// 			index_ptr = nullptr;
-// 			unsigned long long cur = 0;
-// 			custom_index.reserve(info.cell_count);
-
-// 			auto cells_slice = data.substr(info.data_offset, info.data_size);
-
-// 			for (int i = 0; i < info.cell_count; i++)
-// 			{
-// 				vm::CellSerializationInfo cell_info;
-// 				auto status = cell_info.init(cells_slice, info.ref_byte_size);
-// 				if (status.is_error())
-// 				{
-// 					return td::Status::Error(PSLICE()
-// 																	 << "invalid bag-of-cells failed to deserialize cell #" << i << " " << status.error());
-// 				}
-// 				cells_slice = cells_slice.substr(cell_info.end_offset);
-// 				cur += cell_info.end_offset;
-// 				custom_index.push_back(cur);
-// 			}
-// 			if (!cells_slice.empty())
-// 			{
-// 				return td::Status::Error(PSLICE() << "invalid bag-of-cells last cell #" << info.cell_count - 1 << ": end offset "
-// 																					<< cur << " is different from total data size " << info.data_size);
-// 			}
-// 		}
-// 		auto cells_slice = data.substr(info.data_offset, info.data_size);
-// 		std::vector<Ref<vm::DataCell>> cell_list;
-// 		cell_list.reserve(cell_count);
-// 		std::array<td::Ref<Cell>, 4> refs_buf;
-// 		for (int i = 0; i < cell_count; i++)
-// 		{
-// 			// reconstruct cell with index cell_count - 1 - i
-// 			int idx = cell_count - 1 - i;
-// 			auto r_cell = my_deserialize_cell(idx, cells_slice, cell_list, info.has_cache_bits ? &cell_should_cache : nullptr);
-// 			if (r_cell.is_error())
-// 			{
-// 				return td::Status::Error(PSLICE() << "invalid bag-of-cells failed to deserialize cell #" << idx << " "
-// 																					<< r_cell.error());
-// 			}
-// 			cell_list.push_back(r_cell.move_as_ok());
-// 			DCHECK(cell_list.back().not_null());
-// 		}
-// 		if (info.has_cache_bits)
-// 		{
-// 			for (int idx = 0; idx < cell_count; idx++)
-// 			{
-// 				auto should_cache = cell_should_cache[idx] > 1;
-// 				auto stored_should_cache = get_cache_entry(idx);
-// 				if (should_cache != stored_should_cache)
-// 				{
-// 					return td::Status::Error(PSLICE() << "invalid bag-of-cells cell #" << idx << " has wrong cache flag "
-// 																						<< stored_should_cache);
-// 				}
-// 			}
-// 		}
-// 		custom_index.clear();
-// 		index_ptr = nullptr;
-// 		root_count = info.root_count;
-// 		dangle_count = info.absent_count;
-// 		for (auto &root_info : roots)
-// 		{
-// 			root_info.cell = cell_list[root_info.idx];
-// 		}
-// 		cell_list.clear();
-// 		return size_est;
-// 	}
-
-// 	td::Result<td::Ref<vm::DataCell>> my_deserialize_cell(int idx, td::Slice cells_slice,
-// 																												td::Span<td::Ref<DataCell>> cells_span,
-// 																												std::vector<td::uint8> *cell_should_cache)
-// 	{
-// 		TRY_RESULT(cell_slice, get_cell_slice(idx, cells_slice));
-// 		std::array<td::Ref<Cell>, 4> refs_buf;
-
-// 		CellSerializationInfo cell_info;
-// 		TRY_STATUS(cell_info.init(cell_slice, info.ref_byte_size));
-// 		if (cell_info.end_offset != cell_slice.size())
-// 		{
-// 			return td::Status::Error("unused space in cell serialization");
-// 		}
-
-// 		auto refs = td::MutableSpan<td::Ref<Cell>>(refs_buf).substr(0, cell_info.refs_cnt);
-// 		for (int k = 0; k < cell_info.refs_cnt; k++)
-// 		{
-// 			int ref_idx = (int)info.read_ref(cell_slice.ubegin() + cell_info.refs_offset + k * info.ref_byte_size);
-// 			if (ref_idx <= idx)
-// 			{
-// 				return td::Status::Error(PSLICE() << "bag-of-cells error: reference #" << k << " of cell #" << idx
-// 																					<< " is to cell #" << ref_idx << " with smaller index");
-// 			}
-// 			if (ref_idx >= cell_count)
-// 			{
-// 				return td::Status::Error(PSLICE() << "bag-of-cells error: reference #" << k << " of cell #" << idx
-// 																					<< " is to non-existent cell #" << ref_idx << ", only " << cell_count
-// 																					<< " cells are defined");
-// 			}
-// 			refs[k] = cells_span[cell_count - ref_idx - 1];
-// 			if (cell_should_cache)
-// 			{
-// 				auto &cnt = (*cell_should_cache)[ref_idx];
-// 				if (cnt < 2)
-// 				{
-// 					cnt++;
-// 				}
-// 			}
-// 		}
-
-// 		return cell_info.create_data_cell(cell_slice, refs);
-// 	}
-// };
-
-// td::Result<Ref<Cell>> my_std_boc_deserialize(td::Slice data, bool can_be_empty = false, bool allow_nonzero_level = false)
-// {
-// 	if (data.empty() && can_be_empty)
-// 	{
-// 		return Ref<Cell>();
-// 	}
-// 	MyBagOfCells boc;
-// 	auto res = boc.deserialize(data, 1);
-// 	if (res.is_error())
-// 	{
-// 		return res.move_as_error();
-// 	}
-// 	if (boc.get_root_count() != 1)
-// 	{
-// 		return td::Status::Error("bag of cells is expected to have exactly one root");
-// 	}
-// 	auto root = boc.get_root_cell();
-// 	if (root.is_null())
-// 	{
-// 		return td::Status::Error("bag of cells has null root cell (?)");
-// 	}
-// 	if (!allow_nonzero_level && root->get_level() != 0)
-// 	{
-// 		return td::Status::Error("bag of cells has a root with non-zero level");
-// 	}
-// 	return std::move(root);
-// }
-
-using namespace block::gen;
-std::ostream &trace_parse_r(int indent, const char *x)
-{
-	while (indent-- > 0)
-	{
-		std::cout << ' ';
+	// minify-remove:start
+	ostream& indent(int x) {
+		while (x-- > 0)
+		{
+			out << ' ';
+		}
+		return out;
 	}
-	std::cout << x;
-	return std::cout;
-}
+	// minify-remove:end
+};
 
-using namespace block::gen;
-void trace_parse(int indent, const char *x)
-{
-	trace_parse_r(indent, x) << std::endl;
+// minify-remove:start
+string bin_to_hex(const string& bin) {
+	unsigned char buff[2048];
+  auto len = td::bitstring::parse_bitstring_binary_literal(buff, sizeof(buff) * 8, bin.c_str(), bin.c_str() + bin.length());
+	td::BitSlice bs(buff, len);
+	return bs.to_hex();
 }
+// minify-remove:end
+
+set<string> enabled_optimizations{
+	"Block",
+	"BlockExtra",
+	
+	"HashmapAugE",
+	"HashmapAug",
+	"HashmapAugNode",
+
+	"InMsgDescr",
+	"OutMsgDescr",
+
+	// "ImportFees",
+};
+
+template <class T_TLB>
+struct BaseFullCell
+{
+	// keep in mind these cs may contain other cells in the end
+	CellSlice incoming_cs;
+	// and this may be null if optimization is enabled for cell and we're reading opt cs
+	CellSlice std_cell_cs;
+
+	string name;
+	T_TLB type;
+
+	BaseFullCell(string name, T_TLB type): name(name), type(type) {
+
+	}
+
+	virtual ~BaseFullCell() {}
+
+	virtual void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) {
+		// minify-remove
+		throw runtime_error(name + " optimization is enabled but not implemented");
+	}
+
+	virtual void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+		do_pack_std(ctx, cb, indent);
+	}
+
+	virtual void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) {
+		do_unpack_std(ctx, cs, indent);
+	}
+
+	virtual void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+		// minify-remove
+		throw runtime_error(name + " enabled but not implemented");
+	}
+
+	bool is_enabled() {
+		return enabled_optimizations.count(name) > 0;
+	}
+
+	void unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0, bool check_empty = false) {
+		auto e = is_enabled();
+		// minify-remove
+		ctx.indent(indent) << (name + ".unpack_std ") << (e ? "" : "(disabled) ") << cs.as_bitslice().to_hex() << endl;
+
+		incoming_cs = cs;
+
+		if (e) {
+			do_unpack_std(ctx, cs, indent);
+		} else {
+			std_cell_cs = type.fetch(cs).write();
+			// minify-remove
+			ctx.indent(indent) << (name + ".unpack_std: fetched ") <<  std_cell_cs.as_bitslice().to_hex() << endl;
+		}
+		// minify-remove:start
+		if (check_empty) {
+			CHECK(cs.empty_ext());
+		}
+		// minify-remove:end
+	}
+
+	void pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+		auto e = is_enabled();
+
+		// minify-remove
+		auto current_bs = cb.as_cellslice().as_bitslice().to_binary();
+
+		if (e) {
+			do_pack_opt(ctx, cb, indent);
+		} else {
+			cb.append_cellslice(std_cell_cs);
+		}
+
+		// minify-remove:start
+		auto new_bs = cb.as_cellslice().as_bitslice().to_binary();
+		auto added_bs = new_bs.substr(current_bs.length());
+
+		ctx.indent(indent) << (name + ".pack_opt ") << (e ? "" : "(disabled) ") << bin_to_hex(added_bs) << endl;
+		ctx.indent(indent) << (name + ".pack_opt full ") << (e ? "" : "(disabled) ") << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		// minify-remove:end
+	}
+
+	void unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0, bool check_empty = false) {
+		auto e = is_enabled();
+
+		// minify-remove
+		ctx.indent(indent) << (name + ".unpack_opt ") << (e ? "" : "(disabled) ") << cs.as_bitslice().to_hex() << endl;
+		// minify-remove
+		ctx.indent(indent) << (name + ".unpack_opt ") << (e ? "" : "(disabled) ") << cs.as_bitslice().to_binary() << endl;
+
+		incoming_cs = cs;
+
+		if (e) {
+			do_unpack_opt(ctx, cs, indent);
+		} else {
+			std_cell_cs = type.fetch(cs).write();
+			// minify-remove
+			ctx.indent(indent) << (name + ".unpack_opt: fetched ") <<  std_cell_cs.as_bitslice().to_hex() << endl;
+		}
+
+		// minify-remove:start
+		if (check_empty) {
+			CHECK(cs.empty_ext());
+		}
+		// minify-remove:end
+	}
+
+	void pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+		auto e = is_enabled();
+
+		// minify-remove
+		ctx.indent(indent) << (name + ".pack_std begin ") << (e ? "" : "(disabled) ")  << cb.as_cellslice().as_bitslice().to_hex() << endl;
+
+		if (e) {
+			do_pack_std(ctx, cb, indent);
+		} else {
+			if (!std_cell_cs.is_valid()) {
+				throw runtime_error(name + ": optimization is disabled, but std_cell_cs is empty, meaning it was never set");
+			}
+			cb.append_cellslice(std_cell_cs);
+		}
+
+		// minify-remove
+		ctx.indent(indent) << (name + ".pack_std ") << (e ? "" : "(disabled) ") << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		// minify-remove
+		ctx.indent(indent) << (name + ".pack_std ") << (e ? "" : "(disabled) ") << cb.as_cellslice().as_bitslice().to_binary() << endl;
+	}
+
+	Ref<Cell> make_std_cell(ParseContext& ctx, int indent = 0) {
+		// minify-remove
+		ctx.indent(indent) << "------------------- " << name << " std cell begin -------------------" << endl;
+		CellBuilder cb;
+		pack_std(ctx, cb, indent);
+		// minify-remove:start
+		ctx.indent(indent) << "------------------- " << name << " std cell final -------------------" << endl;
+		ctx.indent(indent) << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		ctx.indent(indent) << "------------------- " << name << " std cell end -------------------" << endl;
+		// minify-remove:end
+		return cb.finalize();
+	}
+
+	Ref<Cell> make_opt_cell(ParseContext& ctx, int indent = 0) {
+		// minify-remove
+		ctx.indent(indent) << "------------------- " << name << " opt cell begin -------------------" << endl;
+		CellBuilder cb;
+		pack_opt(ctx, cb, indent);
+		// minify-remove:start
+		ctx.indent(indent) << "------------------- " << name << " opt cell final -------------------" << endl;
+		ctx.indent(indent) << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		ctx.indent(indent) << "------------------- " << name << " opt cell end -------------------" << endl;
+		// minify-remove:end
+		return cb.finalize();
+	}
+
+	void cell_unpack_std(ParseContext& ctx, Ref<Cell> cell_ref, int indent = 0, bool check_empty = false)
+	{
+		auto cs = to_cs(move(cell_ref));
+		unpack_std(ctx, cs, indent, check_empty);
+	}
+
+	void cell_unpack_opt(ParseContext& ctx, Ref<Cell> cell_ref, int indent = 0, bool check_empty = false)
+	{
+		auto cs = to_cs(move(cell_ref));
+		unpack_opt(ctx, cs, indent, check_empty);
+	}
+};
+
+template <class TExtra>
+struct AugDataProvider {
+	virtual ~AugDataProvider() {}
+
+	virtual CellSlice calc_aug_data() {
+		throw runtime_error("aug data requested but not implemented");
+	}
+};
+
+template <class T_TLB>
+struct AddValues {
+
+	T_TLB add_type;
+
+	AddValues(const T_TLB& add_type): add_type(add_type) {}
+
+	virtual ~AddValues() {}
+
+	virtual CellSlice add_values(CellSlice& cs1, CellSlice& cs2) {
+		CellBuilder cb;
+		CHECK(add_type.add_values(cb, cs1, cs2));
+		return cb.as_cellslice();
+	}
+};
+
+using namespace block::tlb;
 
 /// gen start
 
-// struct FullUnit {
-//     Unit::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Unit.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Unit.cell_unpack(std::move(cell_ref), record));
-
-// 	}
+// struct FullUnit : BaseFullCell<block::gen::Unit> {
+//     FullUnit() : BaseFullCell("Unit", block::gen::t_Unit) {}
 // };
-
-// struct FullTrue {
-//     True::Record record;
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_True.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_True.cell_unpack(std::move(cell_ref), record));
-
-// 	}
+// struct FullTrue : BaseFullCell<block::gen::True> {
+//     FullTrue() : BaseFullCell("True", block::gen::t_True) {}
 // };
-
-// struct FullBool {
-//     Bool::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Bool.unpack(cs_ref.write(), record));
-// 	}
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Bool.cell_unpack(std::move(cell_ref), record));
-
-// 	}
+// struct FullBool : BaseFullCell<block::gen::Bool> {
+//     FullBool() : BaseFullCell("Bool", block::gen::t_Bool) {}
 // };
-
-struct FullBoolFalse
-{
-	BoolFalse::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BoolFalse.unpack(cs_ref.write(), record));
-	}
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BoolFalse.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBoolTrue
-{
-	BoolTrue::Record record;
+// struct FullBoolFalse : BaseFullCell<block::gen::BoolFalse> {
+//     FullBoolFalse() : BaseFullCell("BoolFalse", block::gen::t_BoolFalse) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BoolTrue.unpack(cs_ref.write(), record));
-	}
+// struct FullBoolTrue : BaseFullCell<block::gen::BoolTrue> {
+//     FullBoolTrue() : BaseFullCell("BoolTrue", block::gen::t_BoolTrue) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BoolTrue.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullMaybe : BaseFullCell<block::gen::Maybe> {
+//     FullMaybe() : BaseFullCell("Maybe", block::gen::t_Maybe) {}
+// };
 
-// struct FullMaybe {
-//     Maybe::Record record;
+// struct FullEither : BaseFullCell<block::gen::Either> {
+//     FullEither() : BaseFullCell("Either", block::gen::t_Either) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Maybe.unpack(cs_ref.write(), record));
-// 	}
+// struct FullBoth : BaseFullCell<block::gen::Both> {
+//     FullBoth() : BaseFullCell("Both", block::gen::t_Both) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Maybe.cell_unpack(std::move(cell_ref), record));
+// struct FullBit : BaseFullCell<block::gen::Bit> {
+//     FullBit() : BaseFullCell("Bit", block::gen::t_Bit) {}
+// };
 
-// 	}
+// struct FullHashmap : BaseFullCell<block::gen::Hashmap> {
+//     FullHashmap() : BaseFullCell("Hashmap", block::gen::t_Hashmap) {}
 // };
 
-// struct FullEither {
-//     Either::Record record;
+// struct FullHashmapNode : BaseFullCell<block::gen::HashmapNode> {
+//     FullHashmapNode() : BaseFullCell("HashmapNode", block::gen::t_HashmapNode) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Either.unpack(cs_ref.write(), record));
-// 	}
+// struct FullHmLabel : BaseFullCell<block::gen::HmLabel> {
+//     FullHmLabel() : BaseFullCell("HmLabel", block::gen::t_HmLabel) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Either.cell_unpack(std::move(cell_ref), record));
+// struct FullUnary : BaseFullCell<block::gen::Unary> {
+//     FullUnary() : BaseFullCell("Unary", block::gen::t_Unary) {}
+// };
 
-// 	}
+// struct FullHashmapE : BaseFullCell<block::gen::HashmapE> {
+//     FullHashmapE() : BaseFullCell("HashmapE", block::gen::t_HashmapE) {}
 // };
 
-// struct FullBoth {
-//     Both::Record record;
+// struct FullBitstringSet : BaseFullCell<block::gen::BitstringSet> {
+//     FullBitstringSet() : BaseFullCell("BitstringSet", block::gen::t_BitstringSet) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Both.unpack(cs_ref.write(), record));
-// 	}
+// struct FullVarHashmap : BaseFullCell<block::gen::VarHashmap> {
+//     FullVarHashmap() : BaseFullCell("VarHashmap", block::gen::t_VarHashmap) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Both.cell_unpack(std::move(cell_ref), record));
+// struct FullVarHashmapNode : BaseFullCell<block::gen::VarHashmapNode> {
+//     FullVarHashmapNode() : BaseFullCell("VarHashmapNode", block::gen::t_VarHashmapNode) {}
+// };
 
-// 	}
+// struct FullVarHashmapE : BaseFullCell<block::gen::VarHashmapE> {
+//     FullVarHashmapE() : BaseFullCell("VarHashmapE", block::gen::t_VarHashmapE) {}
 // };
 
-struct FullBit
-{
-	Bit::Record record;
+// struct FullPfxHashmap : BaseFullCell<block::gen::PfxHashmap> {
+//     FullPfxHashmap() : BaseFullCell("PfxHashmap", block::gen::t_PfxHashmap) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Bit.unpack(cs_ref.write(), record));
-	}
+// struct FullPfxHashmapNode : BaseFullCell<block::gen::PfxHashmapNode> {
+//     FullPfxHashmapNode() : BaseFullCell("PfxHashmapNode", block::gen::t_PfxHashmapNode) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Bit.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullPfxHashmapE : BaseFullCell<block::gen::PfxHashmapE> {
+//     FullPfxHashmapE() : BaseFullCell("PfxHashmapE", block::gen::t_PfxHashmapE) {}
+// };
 
-// struct FullHashmap {
-//     Hashmap::Record record;
+// struct FullMsgAddressExt : BaseFullCell<block::gen::MsgAddressExt> {
+//     FullMsgAddressExt() : BaseFullCell("MsgAddressExt", block::gen::t_MsgAddressExt) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Hashmap.unpack(cs_ref.write(), record));
-// 	}
+// struct FullAnycast : BaseFullCell<block::gen::Anycast> {
+//     FullAnycast() : BaseFullCell("Anycast", block::gen::t_Anycast) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Hashmap.cell_unpack(std::move(cell_ref), record));
+// struct FullMsgAddressInt : BaseFullCell<block::gen::MsgAddressInt> {
+//     FullMsgAddressInt() : BaseFullCell("MsgAddressInt", block::gen::t_MsgAddressInt) {}
+// };
 
-// 	}
+// struct FullMsgAddress : BaseFullCell<block::gen::MsgAddress> {
+//     FullMsgAddress() : BaseFullCell("MsgAddress", block::gen::t_MsgAddress) {}
 // };
 
-// struct FullHashmapNode {
-//     HashmapNode::Record record;
+// struct FullVarUInteger : BaseFullCell<block::gen::VarUInteger> {
+//     FullVarUInteger() : BaseFullCell("VarUInteger", block::gen::t_VarUInteger) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_HashmapNode.unpack(cs_ref.write(), record));
-// 	}
+// struct FullVarInteger : BaseFullCell<block::gen::VarInteger> {
+//     FullVarInteger() : BaseFullCell("VarInteger", block::gen::t_VarInteger) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_HashmapNode.cell_unpack(std::move(cell_ref), record));
+// struct FullGrams : BaseFullCell<block::gen::Grams> {
+//     FullGrams() : BaseFullCell("Grams", block::gen::t_Grams) {}
+// };
 
-// 	}
+// struct FullCoins : BaseFullCell<block::gen::Coins> {
+//     FullCoins() : BaseFullCell("Coins", block::gen::t_Coins) {}
 // };
 
-// struct FullHmLabel {
-//     HmLabel::Record record;
+// struct FullExtraCurrencyCollection : BaseFullCell<block::gen::ExtraCurrencyCollection> {
+//     FullExtraCurrencyCollection() : BaseFullCell("ExtraCurrencyCollection", block::gen::t_ExtraCurrencyCollection) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_HmLabel.unpack(cs_ref.write(), record));
-// 	}
+// struct FullCommonMsgInfo : BaseFullCell<block::gen::CommonMsgInfo> {
+//     FullCommonMsgInfo() : BaseFullCell("CommonMsgInfo", block::gen::t_CommonMsgInfo) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_HmLabel.cell_unpack(std::move(cell_ref), record));
+// struct FullCommonMsgInfoRelaxed : BaseFullCell<block::gen::CommonMsgInfoRelaxed> {
+//     FullCommonMsgInfoRelaxed() : BaseFullCell("CommonMsgInfoRelaxed", block::gen::t_CommonMsgInfoRelaxed) {}
+// };
 
-// 	}
+// struct FullTickTock : BaseFullCell<block::gen::TickTock> {
+//     FullTickTock() : BaseFullCell("TickTock", block::gen::t_TickTock) {}
 // };
 
-// struct FullUnary {
-//     Unary::Record record;
+// struct FullStateInit : BaseFullCell<block::gen::StateInit> {
+//     FullStateInit() : BaseFullCell("StateInit", block::gen::t_StateInit) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Unary.unpack(cs_ref.write(), record));
-// 	}
+// struct FullStateInitWithLibs : BaseFullCell<block::gen::StateInitWithLibs> {
+//     FullStateInitWithLibs() : BaseFullCell("StateInitWithLibs", block::gen::t_StateInitWithLibs) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Unary.cell_unpack(std::move(cell_ref), record));
+// struct FullSimpleLib : BaseFullCell<block::gen::SimpleLib> {
+//     FullSimpleLib() : BaseFullCell("SimpleLib", block::gen::t_SimpleLib) {}
+// };
 
-// 	}
+// struct FullMessage : BaseFullCell<block::gen::Message> {
+//     FullMessage() : BaseFullCell("Message", block::gen::t_Message) {}
 // };
 
-// struct FullHashmapE {
-//     HashmapE::Record record;
+// struct FullMessageRelaxed : BaseFullCell<block::gen::MessageRelaxed> {
+//     FullMessageRelaxed() : BaseFullCell("MessageRelaxed", block::gen::t_MessageRelaxed) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_HashmapE.unpack(cs_ref.write(), record));
-// 	}
+// struct FullMessageAny : BaseFullCell<block::gen::MessageAny> {
+//     FullMessageAny() : BaseFullCell("MessageAny", block::gen::t_MessageAny) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_HashmapE.cell_unpack(std::move(cell_ref), record));
+// struct FullIntermediateAddress : BaseFullCell<block::gen::IntermediateAddress> {
+//     FullIntermediateAddress() : BaseFullCell("IntermediateAddress", block::gen::t_IntermediateAddress) {}
+// };
 
-// 	}
+// struct FullMsgMetadata : BaseFullCell<block::gen::MsgMetadata> {
+//     FullMsgMetadata() : BaseFullCell("MsgMetadata", block::gen::t_MsgMetadata) {}
 // };
 
-// struct FullBitstringSet {
-//     BitstringSet::Record record;
+// struct FullMsgEnvelope : BaseFullCell<block::gen::MsgEnvelope> {
+//     FullMsgEnvelope() : BaseFullCell("MsgEnvelope", block::gen::t_MsgEnvelope) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_BitstringSet.unpack(cs_ref.write(), record));
-// 	}
+struct FullImportFees;
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_BitstringSet.cell_unpack(std::move(cell_ref), record));
+struct FullInMsg : BaseFullCell<InMsg>, AugDataProvider<FullImportFees> {
+    FullInMsg() : BaseFullCell("InMsg", t_InMsg) {}
 
-// 	}
-// };
+	CellSlice calc_aug_data() override {
+		CellBuilder cb;
+		auto cs_copy = std_cell_cs;
+		CHECK(t_InMsg.get_import_fees(cb, cs_copy));
+		return cb.as_cellslice();
+	}
+};
 
-// struct FullHashmapAugE {
-//     HashmapAugE::Record record;
+struct FullCurrencyCollection;
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_HashmapAugE.unpack(cs_ref.write(), record));
-// 	}
+struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection> {
+    FullOutMsg() : BaseFullCell("OutMsg", t_OutMsg) {}
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_HashmapAugE.cell_unpack(std::move(cell_ref), record));
+	CellSlice calc_aug_data() override {
+		CellBuilder cb;
+		auto cs_copy = std_cell_cs;
+		CHECK(t_OutMsg.get_export_value(cb, cs_copy));
+		return cb.as_cellslice();
+	}
+};
 
-// 	}
+// struct FullEnqueuedMsg : BaseFullCell<block::gen::EnqueuedMsg> {
+//     FullEnqueuedMsg() : BaseFullCell("EnqueuedMsg", block::gen::t_EnqueuedMsg) {}
 // };
-
-// struct FullVarHashmap {
-//     VarHashmap::Record record;
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VarHashmap.unpack(cs_ref.write(), record));
-// 	}
+// struct FullProcessedUpto : BaseFullCell<block::gen::ProcessedUpto> {
+//     FullProcessedUpto() : BaseFullCell("ProcessedUpto", block::gen::t_ProcessedUpto) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VarHashmap.cell_unpack(std::move(cell_ref), record));
+// struct FullProcessedInfo : BaseFullCell<block::gen::ProcessedInfo> {
+//     FullProcessedInfo() : BaseFullCell("ProcessedInfo", block::gen::t_ProcessedInfo) {}
+// };
 
-// 	}
+// struct FullIhrPendingSince : BaseFullCell<block::gen::IhrPendingSince> {
+//     FullIhrPendingSince() : BaseFullCell("IhrPendingSince", block::gen::t_IhrPendingSince) {}
 // };
 
-// struct FullVarHashmapNode {
-//     VarHashmapNode::Record record;
+// struct FullIhrPendingInfo : BaseFullCell<block::gen::IhrPendingInfo> {
+//     FullIhrPendingInfo() : BaseFullCell("IhrPendingInfo", block::gen::t_IhrPendingInfo) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VarHashmapNode.unpack(cs_ref.write(), record));
-// 	}
+// struct FullAccountDispatchQueue : BaseFullCell<block::gen::AccountDispatchQueue> {
+//     FullAccountDispatchQueue() : BaseFullCell("AccountDispatchQueue", block::gen::t_AccountDispatchQueue) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VarHashmapNode.cell_unpack(std::move(cell_ref), record));
+// struct FullDispatchQueue : BaseFullCell<block::gen::DispatchQueue> {
+//     FullDispatchQueue() : BaseFullCell("DispatchQueue", block::gen::t_DispatchQueue) {}
+// };
 
-// 	}
+// struct FullOutMsgQueueExtra : BaseFullCell<block::gen::OutMsgQueueExtra> {
+//     FullOutMsgQueueExtra() : BaseFullCell("OutMsgQueueExtra", block::gen::t_OutMsgQueueExtra) {}
 // };
 
-// struct FullVarHashmapE {
-//     VarHashmapE::Record record;
+// struct FullOutMsgQueueInfo : BaseFullCell<block::gen::OutMsgQueueInfo> {
+//     FullOutMsgQueueInfo() : BaseFullCell("OutMsgQueueInfo", block::gen::t_OutMsgQueueInfo) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VarHashmapE.unpack(cs_ref.write(), record));
-// 	}
+// struct FullStorageUsed : BaseFullCell<block::gen::StorageUsed> {
+//     FullStorageUsed() : BaseFullCell("StorageUsed", block::gen::t_StorageUsed) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VarHashmapE.cell_unpack(std::move(cell_ref), record));
+// struct FullStorageUsedShort : BaseFullCell<block::gen::StorageUsedShort> {
+//     FullStorageUsedShort() : BaseFullCell("StorageUsedShort", block::gen::t_StorageUsedShort) {}
+// };
 
-// 	}
+// struct FullStorageInfo : BaseFullCell<block::gen::StorageInfo> {
+//     FullStorageInfo() : BaseFullCell("StorageInfo", block::gen::t_StorageInfo) {}
 // };
 
-// struct FullPfxHashmap {
-//     PfxHashmap::Record record;
+// struct FullAccount : BaseFullCell<block::gen::Account> {
+//     FullAccount() : BaseFullCell("Account", block::gen::t_Account) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_PfxHashmap.unpack(cs_ref.write(), record));
-// 	}
+// struct FullAccountStorage : BaseFullCell<block::gen::AccountStorage> {
+//     FullAccountStorage() : BaseFullCell("AccountStorage", block::gen::t_AccountStorage) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_PfxHashmap.cell_unpack(std::move(cell_ref), record));
+// struct FullAccountState : BaseFullCell<block::gen::AccountState> {
+//     FullAccountState() : BaseFullCell("AccountState", block::gen::t_AccountState) {}
+// };
 
-// 	}
+// struct FullAccountStatus : BaseFullCell<block::gen::AccountStatus> {
+//     FullAccountStatus() : BaseFullCell("AccountStatus", block::gen::t_AccountStatus) {}
 // };
 
-// struct FullPfxHashmapNode {
-//     PfxHashmapNode::Record record;
+// struct FullShardAccount : BaseFullCell<block::gen::ShardAccount> {
+//     FullShardAccount() : BaseFullCell("ShardAccount", block::gen::t_ShardAccount) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_PfxHashmapNode.unpack(cs_ref.write(), record));
-// 	}
+// struct FullDepthBalanceInfo : BaseFullCell<block::gen::DepthBalanceInfo> {
+//     FullDepthBalanceInfo() : BaseFullCell("DepthBalanceInfo", block::gen::t_DepthBalanceInfo) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_PfxHashmapNode.cell_unpack(std::move(cell_ref), record));
+// struct FullShardAccounts : BaseFullCell<block::gen::ShardAccounts> {
+//     FullShardAccounts() : BaseFullCell("ShardAccounts", block::gen::t_ShardAccounts) {}
+// };
 
-// 	}
+// struct FullTransaction_aux : BaseFullCell<block::gen::Transaction_aux> {
+//     FullTransaction_aux() : BaseFullCell("Transaction_aux", block::gen::t_Transaction_aux) {}
 // };
 
-// struct FullPfxHashmapE {
-//     PfxHashmapE::Record record;
+// struct FullTransaction : BaseFullCell<block::gen::Transaction> {
+//     FullTransaction() : BaseFullCell("Transaction", block::gen::t_Transaction) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_PfxHashmapE.unpack(cs_ref.write(), record));
-// 	}
+// struct FullMERKLE_UPDATE : BaseFullCell<block::gen::MERKLE_UPDATE> {
+//     FullMERKLE_UPDATE() : BaseFullCell("MERKLE_UPDATE", block::gen::t_MERKLE_UPDATE) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_PfxHashmapE.cell_unpack(std::move(cell_ref), record));
+// struct FullHASH_UPDATE : BaseFullCell<block::gen::HASH_UPDATE> {
+//     FullHASH_UPDATE() : BaseFullCell("HASH_UPDATE", block::gen::t_HASH_UPDATE) {}
+// };
 
-// 	}
+// struct FullMERKLE_PROOF : BaseFullCell<block::gen::MERKLE_PROOF> {
+//     FullMERKLE_PROOF() : BaseFullCell("MERKLE_PROOF", block::gen::t_MERKLE_PROOF) {}
 // };
 
-// struct FullMsgAddressExt {
-//     MsgAddressExt::Record record;
+// struct FullAccountBlock : BaseFullCell<block::gen::AccountBlock> {
+//     FullAccountBlock() : BaseFullCell("AccountBlock", block::gen::t_AccountBlock) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MsgAddressExt.unpack(cs_ref.write(), record));
-// 	}
+// struct FullShardAccountBlocks : BaseFullCell<block::gen::ShardAccountBlocks> {
+//     FullShardAccountBlocks() : BaseFullCell("ShardAccountBlocks", block::gen::t_ShardAccountBlocks) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MsgAddressExt.cell_unpack(std::move(cell_ref), record));
+// struct FullTrStoragePhase : BaseFullCell<block::gen::TrStoragePhase> {
+//     FullTrStoragePhase() : BaseFullCell("TrStoragePhase", block::gen::t_TrStoragePhase) {}
+// };
 
-// 	}
+// struct FullAccStatusChange : BaseFullCell<block::gen::AccStatusChange> {
+//     FullAccStatusChange() : BaseFullCell("AccStatusChange", block::gen::t_AccStatusChange) {}
 // };
 
-struct FullAnycast
-{
-	Anycast::Record record;
+// struct FullTrCreditPhase : BaseFullCell<block::gen::TrCreditPhase> {
+//     FullTrCreditPhase() : BaseFullCell("TrCreditPhase", block::gen::t_TrCreditPhase) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Anycast.unpack(cs_ref.write(), record));
-	}
+// struct FullTrComputePhase_aux : BaseFullCell<block::gen::TrComputePhase_aux> {
+//     FullTrComputePhase_aux() : BaseFullCell("TrComputePhase_aux", block::gen::t_TrComputePhase_aux) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Anycast.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullTrComputePhase : BaseFullCell<block::gen::TrComputePhase> {
+//     FullTrComputePhase() : BaseFullCell("TrComputePhase", block::gen::t_TrComputePhase) {}
+// };
 
-// struct FullMsgAddressInt {
-//     MsgAddressInt::Record record;
+// struct FullComputeSkipReason : BaseFullCell<block::gen::ComputeSkipReason> {
+//     FullComputeSkipReason() : BaseFullCell("ComputeSkipReason", block::gen::t_ComputeSkipReason) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MsgAddressInt.unpack(cs_ref.write(), record));
-// 	}
+// struct FullTrActionPhase : BaseFullCell<block::gen::TrActionPhase> {
+//     FullTrActionPhase() : BaseFullCell("TrActionPhase", block::gen::t_TrActionPhase) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MsgAddressInt.cell_unpack(std::move(cell_ref), record));
+// struct FullTrBouncePhase : BaseFullCell<block::gen::TrBouncePhase> {
+//     FullTrBouncePhase() : BaseFullCell("TrBouncePhase", block::gen::t_TrBouncePhase) {}
+// };
 
-// 	}
+// struct FullSplitMergeInfo : BaseFullCell<block::gen::SplitMergeInfo> {
+//     FullSplitMergeInfo() : BaseFullCell("SplitMergeInfo", block::gen::t_SplitMergeInfo) {}
 // };
 
-// struct FullMsgAddress {
-//     MsgAddress::Record record;
+// struct FullTransactionDescr : BaseFullCell<block::gen::TransactionDescr> {
+//     FullTransactionDescr() : BaseFullCell("TransactionDescr", block::gen::t_TransactionDescr) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MsgAddress.unpack(cs_ref.write(), record));
-// 	}
+// struct FullSmartContractInfo : BaseFullCell<block::gen::SmartContractInfo> {
+//     FullSmartContractInfo() : BaseFullCell("SmartContractInfo", block::gen::t_SmartContractInfo) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MsgAddress.cell_unpack(std::move(cell_ref), record));
+// struct FullOutList : BaseFullCell<block::gen::OutList> {
+//     FullOutList() : BaseFullCell("OutList", block::gen::t_OutList) {}
+// };
 
-// 	}
+// struct FullLibRef : BaseFullCell<block::gen::LibRef> {
+//     FullLibRef() : BaseFullCell("LibRef", block::gen::t_LibRef) {}
 // };
 
-// struct FullVarUInteger {
-//     VarUInteger::Record record;
+// struct FullOutAction : BaseFullCell<block::gen::OutAction> {
+//     FullOutAction() : BaseFullCell("OutAction", block::gen::t_OutAction) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VarUInteger.unpack(cs_ref.write(), record));
-// 	}
+// struct FullOutListNode : BaseFullCell<block::gen::OutListNode> {
+//     FullOutListNode() : BaseFullCell("OutListNode", block::gen::t_OutListNode) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VarUInteger.cell_unpack(std::move(cell_ref), record));
+// struct FullShardIdent : BaseFullCell<block::gen::ShardIdent> {
+//     FullShardIdent() : BaseFullCell("ShardIdent", block::gen::t_ShardIdent) {}
+// };
 
-// 	}
+// struct FullExtBlkRef : BaseFullCell<block::gen::ExtBlkRef> {
+//     FullExtBlkRef() : BaseFullCell("ExtBlkRef", block::gen::t_ExtBlkRef) {}
 // };
 
-// struct FullVarInteger {
-//     VarInteger::Record record;
+// struct FullBlockIdExt : BaseFullCell<block::gen::BlockIdExt> {
+//     FullBlockIdExt() : BaseFullCell("BlockIdExt", block::gen::t_BlockIdExt) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VarInteger.unpack(cs_ref.write(), record));
-// 	}
+// struct FullBlkMasterInfo : BaseFullCell<block::gen::BlkMasterInfo> {
+//     FullBlkMasterInfo() : BaseFullCell("BlkMasterInfo", block::gen::t_BlkMasterInfo) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VarInteger.cell_unpack(std::move(cell_ref), record));
+// struct FullShardStateUnsplit_aux : BaseFullCell<block::gen::ShardStateUnsplit_aux> {
+//     FullShardStateUnsplit_aux() : BaseFullCell("ShardStateUnsplit_aux", block::gen::t_ShardStateUnsplit_aux) {}
+// };
 
-// 	}
+// struct FullShardStateUnsplit : BaseFullCell<block::gen::ShardStateUnsplit> {
+//     FullShardStateUnsplit() : BaseFullCell("ShardStateUnsplit", block::gen::t_ShardStateUnsplit) {}
 // };
 
-struct FullCoins
-{
-	Coins::Record record;
+// struct FullShardState : BaseFullCell<block::gen::ShardState> {
+//     FullShardState() : BaseFullCell("ShardState", block::gen::t_ShardState) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Coins.unpack(cs_ref.write(), record));
-	}
+// struct FullLibDescr : BaseFullCell<block::gen::LibDescr> {
+//     FullLibDescr() : BaseFullCell("LibDescr", block::gen::t_LibDescr) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Coins.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullBlockInfo : BaseFullCell<block::gen::BlockInfo> {
+//     FullBlockInfo() : BaseFullCell("BlockInfo", block::gen::t_BlockInfo) {}
+// };
 
-struct FullExtraCurrencyCollection
-{
-	ExtraCurrencyCollection::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullExtraCurrencyCollection.unpack");
-		CHECK(t_ExtraCurrencyCollection.unpack(cs_ref.write(), record));
-	}
+// struct FullBlkPrevInfo : BaseFullCell<block::gen::BlkPrevInfo> {
+//     FullBlkPrevInfo() : BaseFullCell("BlkPrevInfo", block::gen::t_BlkPrevInfo) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ExtraCurrencyCollection.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullTYPE_1657 : BaseFullCell<block::gen::TYPE_1657> {
+//     FullTYPE_1657() : BaseFullCell("TYPE_1657", block::gen::t_TYPE_1657) {}
+// };
 
-// struct FullCommonMsgInfo {
-//     CommonMsgInfo::Record record;
+// struct FullTYPE_1658 : BaseFullCell<block::gen::TYPE_1658> {
+//     FullTYPE_1658() : BaseFullCell("TYPE_1658", block::gen::t_TYPE_1658) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_CommonMsgInfo.unpack(cs_ref.write(), record));
-// 	}
+// struct FullValueFlow : BaseFullCell<block::gen::ValueFlow> {
+//     FullValueFlow() : BaseFullCell("ValueFlow", block::gen::t_ValueFlow) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_CommonMsgInfo.cell_unpack(std::move(cell_ref), record));
+// struct FullBinTree : BaseFullCell<block::gen::BinTree> {
+//     FullBinTree() : BaseFullCell("BinTree", block::gen::t_BinTree) {}
+// };
 
-// 	}
+// struct FullFutureSplitMerge : BaseFullCell<block::gen::FutureSplitMerge> {
+//     FullFutureSplitMerge() : BaseFullCell("FutureSplitMerge", block::gen::t_FutureSplitMerge) {}
 // };
 
-// struct FullCommonMsgInfoRelaxed {
-//     CommonMsgInfoRelaxed::Record record;
+// struct FullShardDescr_aux : BaseFullCell<block::gen::ShardDescr_aux> {
+//     FullShardDescr_aux() : BaseFullCell("ShardDescr_aux", block::gen::t_ShardDescr_aux) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_CommonMsgInfoRelaxed.unpack(cs_ref.write(), record));
-// 	}
+// struct FullShardDescr : BaseFullCell<block::gen::ShardDescr> {
+//     FullShardDescr() : BaseFullCell("ShardDescr", block::gen::t_ShardDescr) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_CommonMsgInfoRelaxed.cell_unpack(std::move(cell_ref), record));
+// struct FullShardHashes : BaseFullCell<block::gen::ShardHashes> {
+//     FullShardHashes() : BaseFullCell("ShardHashes", block::gen::t_ShardHashes) {}
+// };
 
-// 	}
+// struct FullBinTreeAug : BaseFullCell<block::gen::BinTreeAug> {
+//     FullBinTreeAug() : BaseFullCell("BinTreeAug", block::gen::t_BinTreeAug) {}
 // };
 
-struct FullTickTock
-{
-	TickTock::Record record;
+// struct FullShardFeeCreated : BaseFullCell<block::gen::ShardFeeCreated> {
+//     FullShardFeeCreated() : BaseFullCell("ShardFeeCreated", block::gen::t_ShardFeeCreated) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TickTock.unpack(cs_ref.write(), record));
-	}
+// struct FullShardFees : BaseFullCell<block::gen::ShardFees> {
+//     FullShardFees() : BaseFullCell("ShardFees", block::gen::t_ShardFees) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TickTock.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullConfigParams : BaseFullCell<block::gen::ConfigParams> {
+//     FullConfigParams() : BaseFullCell("ConfigParams", block::gen::t_ConfigParams) {}
+// };
 
-struct FullStateInit
-{
-	StateInit::Record record;
+// struct FullValidatorInfo : BaseFullCell<block::gen::ValidatorInfo> {
+//     FullValidatorInfo() : BaseFullCell("ValidatorInfo", block::gen::t_ValidatorInfo) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_StateInit.unpack(cs_ref.write(), record));
-	}
+// struct FullValidatorBaseInfo : BaseFullCell<block::gen::ValidatorBaseInfo> {
+//     FullValidatorBaseInfo() : BaseFullCell("ValidatorBaseInfo", block::gen::t_ValidatorBaseInfo) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_StateInit.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullKeyMaxLt : BaseFullCell<block::gen::KeyMaxLt> {
+//     FullKeyMaxLt() : BaseFullCell("KeyMaxLt", block::gen::t_KeyMaxLt) {}
+// };
 
-struct FullStateInitWithLibs
-{
-	StateInitWithLibs::Record record;
+// struct FullKeyExtBlkRef : BaseFullCell<block::gen::KeyExtBlkRef> {
+//     FullKeyExtBlkRef() : BaseFullCell("KeyExtBlkRef", block::gen::t_KeyExtBlkRef) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_StateInitWithLibs.unpack(cs_ref.write(), record));
-	}
+// struct FullOldMcBlocksInfo : BaseFullCell<block::gen::OldMcBlocksInfo> {
+//     FullOldMcBlocksInfo() : BaseFullCell("OldMcBlocksInfo", block::gen::t_OldMcBlocksInfo) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_StateInitWithLibs.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullCounters : BaseFullCell<block::gen::Counters> {
+//     FullCounters() : BaseFullCell("Counters", block::gen::t_Counters) {}
+// };
 
-struct FullSimpleLib
-{
-	SimpleLib::Record record;
+// struct FullCreatorStats : BaseFullCell<block::gen::CreatorStats> {
+//     FullCreatorStats() : BaseFullCell("CreatorStats", block::gen::t_CreatorStats) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_SimpleLib.unpack(cs_ref.write(), record));
-	}
+// struct FullBlockCreateStats : BaseFullCell<block::gen::BlockCreateStats> {
+//     FullBlockCreateStats() : BaseFullCell("BlockCreateStats", block::gen::t_BlockCreateStats) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_SimpleLib.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullMcStateExtra_aux : BaseFullCell<block::gen::McStateExtra_aux> {
+//     FullMcStateExtra_aux() : BaseFullCell("McStateExtra_aux", block::gen::t_McStateExtra_aux) {}
+// };
 
-// struct FullMessage {
-//     Message::Record record;
+// struct FullMcStateExtra : BaseFullCell<block::gen::McStateExtra> {
+//     FullMcStateExtra() : BaseFullCell("McStateExtra", block::gen::t_McStateExtra) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Message.unpack(cs_ref.write(), record));
-// 	}
+// struct FullSigPubKey : BaseFullCell<block::gen::SigPubKey> {
+//     FullSigPubKey() : BaseFullCell("SigPubKey", block::gen::t_SigPubKey) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Message.cell_unpack(std::move(cell_ref), record));
+// struct FullCryptoSignatureSimple : BaseFullCell<block::gen::CryptoSignatureSimple> {
+//     FullCryptoSignatureSimple() : BaseFullCell("CryptoSignatureSimple", block::gen::t_CryptoSignatureSimple) {}
+// };
 
-// 	}
+// struct FullCryptoSignaturePair : BaseFullCell<block::gen::CryptoSignaturePair> {
+//     FullCryptoSignaturePair() : BaseFullCell("CryptoSignaturePair", block::gen::t_CryptoSignaturePair) {}
 // };
 
-// struct FullMessageRelaxed {
-//     MessageRelaxed::Record record;
+// struct FullCertificate : BaseFullCell<block::gen::Certificate> {
+//     FullCertificate() : BaseFullCell("Certificate", block::gen::t_Certificate) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MessageRelaxed.unpack(cs_ref.write(), record));
-// 	}
+// struct FullCertificateEnv : BaseFullCell<block::gen::CertificateEnv> {
+//     FullCertificateEnv() : BaseFullCell("CertificateEnv", block::gen::t_CertificateEnv) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MessageRelaxed.cell_unpack(std::move(cell_ref), record));
+// struct FullSignedCertificate : BaseFullCell<block::gen::SignedCertificate> {
+//     FullSignedCertificate() : BaseFullCell("SignedCertificate", block::gen::t_SignedCertificate) {}
+// };
 
-// 	}
+// struct FullCryptoSignature : BaseFullCell<block::gen::CryptoSignature> {
+//     FullCryptoSignature() : BaseFullCell("CryptoSignature", block::gen::t_CryptoSignature) {}
 // };
 
-struct FullMessageAny
-{
-	MessageAny::Record record;
+// struct FullMcBlockExtra_aux : BaseFullCell<block::gen::McBlockExtra_aux> {
+//     FullMcBlockExtra_aux() : BaseFullCell("McBlockExtra_aux", block::gen::t_McBlockExtra_aux) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_MessageAny.unpack(cs_ref.write(), record));
-	}
+// struct FullMcBlockExtra : BaseFullCell<block::gen::McBlockExtra> {
+//     FullMcBlockExtra() : BaseFullCell("McBlockExtra", block::gen::t_McBlockExtra) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_MessageAny.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullValidatorDescr : BaseFullCell<block::gen::ValidatorDescr> {
+//     FullValidatorDescr() : BaseFullCell("ValidatorDescr", block::gen::t_ValidatorDescr) {}
+// };
 
-// struct FullIntermediateAddress {
-//     IntermediateAddress::Record record;
+// struct FullValidatorSet : BaseFullCell<block::gen::ValidatorSet> {
+//     FullValidatorSet() : BaseFullCell("ValidatorSet", block::gen::t_ValidatorSet) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_IntermediateAddress.unpack(cs_ref.write(), record));
-// 	}
+// struct FullBurningConfig : BaseFullCell<block::gen::BurningConfig> {
+//     FullBurningConfig() : BaseFullCell("BurningConfig", block::gen::t_BurningConfig) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_IntermediateAddress.cell_unpack(std::move(cell_ref), record));
+// struct FullGlobalVersion : BaseFullCell<block::gen::GlobalVersion> {
+//     FullGlobalVersion() : BaseFullCell("GlobalVersion", block::gen::t_GlobalVersion) {}
+// };
 
-// 	}
+// struct FullConfigProposalSetup : BaseFullCell<block::gen::ConfigProposalSetup> {
+//     FullConfigProposalSetup() : BaseFullCell("ConfigProposalSetup", block::gen::t_ConfigProposalSetup) {}
 // };
 
-struct FullMsgMetadata
-{
-	MsgMetadata::Record record;
+// struct FullConfigVotingSetup : BaseFullCell<block::gen::ConfigVotingSetup> {
+//     FullConfigVotingSetup() : BaseFullCell("ConfigVotingSetup", block::gen::t_ConfigVotingSetup) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_MsgMetadata.unpack(cs_ref.write(), record));
-	}
+// struct FullConfigProposal : BaseFullCell<block::gen::ConfigProposal> {
+//     FullConfigProposal() : BaseFullCell("ConfigProposal", block::gen::t_ConfigProposal) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_MsgMetadata.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullConfigProposalStatus : BaseFullCell<block::gen::ConfigProposalStatus> {
+//     FullConfigProposalStatus() : BaseFullCell("ConfigProposalStatus", block::gen::t_ConfigProposalStatus) {}
+// };
 
-// struct FullMsgEnvelope {
-//     MsgEnvelope::Record record;
+// struct FullWorkchainFormat : BaseFullCell<block::gen::WorkchainFormat> {
+//     FullWorkchainFormat() : BaseFullCell("WorkchainFormat", block::gen::t_WorkchainFormat) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MsgEnvelope.unpack(cs_ref.write(), record));
-// 	}
+// struct FullWcSplitMergeTimings : BaseFullCell<block::gen::WcSplitMergeTimings> {
+//     FullWcSplitMergeTimings() : BaseFullCell("WcSplitMergeTimings", block::gen::t_WcSplitMergeTimings) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MsgEnvelope.cell_unpack(std::move(cell_ref), record));
+// struct FullWorkchainDescr : BaseFullCell<block::gen::WorkchainDescr> {
+//     FullWorkchainDescr() : BaseFullCell("WorkchainDescr", block::gen::t_WorkchainDescr) {}
+// };
 
-// 	}
+// struct FullComplaintPricing : BaseFullCell<block::gen::ComplaintPricing> {
+//     FullComplaintPricing() : BaseFullCell("ComplaintPricing", block::gen::t_ComplaintPricing) {}
 // };
 
-struct FullInMsg
-{
-	// InMsg::Record_msg_import_ext record_msg_import_ext;
-	// InMsg::Record_msg_import_ihr record_msg_import_ihr;
-	// InMsg::Record_msg_import_imm record_msg_import_imm;
-	// InMsg::Record_msg_import_fin record_msg_import_fin;
-	// InMsg::Record_msg_import_tr record_msg_import_tr;
-	// InMsg::Record_msg_discard_fin record_msg_discard_fin;
-	// InMsg::Record_msg_discard_tr record_msg_discard_tr;
-	// InMsg::Record_msg_import_deferred_fin record_msg_import_deferred_fin;
-	// InMsg::Record_msg_import_deferred_tr record_msg_import_deferred_tr;
+// struct FullBlockCreateFees : BaseFullCell<block::gen::BlockCreateFees> {
+//     FullBlockCreateFees() : BaseFullCell("BlockCreateFees", block::gen::t_BlockCreateFees) {}
+// };
 
-	int tag = -1;
+// struct FullStoragePrices : BaseFullCell<block::gen::StoragePrices> {
+//     FullStoragePrices() : BaseFullCell("StoragePrices", block::gen::t_StoragePrices) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullInMsg.unpack");
-		tag = t_InMsg.check_tag(cs_ref.write());
+// struct FullGasLimitsPrices : BaseFullCell<block::gen::GasLimitsPrices> {
+//     FullGasLimitsPrices() : BaseFullCell("GasLimitsPrices", block::gen::t_GasLimitsPrices) {}
+// };
 
-		// if (tag == InMsg::msg_import_ext) {
-		// 	CHECK(t_InMsg.unpack(cs_ref.write(), record_msg_import_ext));
-		// }
-	}
-};
+// struct FullParamLimits : BaseFullCell<block::gen::ParamLimits> {
+//     FullParamLimits() : BaseFullCell("ParamLimits", block::gen::t_ParamLimits) {}
+// };
 
-// struct FullOutMsg {
-//     OutMsg::Record record;
+// struct FullBlockLimits : BaseFullCell<block::gen::BlockLimits> {
+//     FullBlockLimits() : BaseFullCell("BlockLimits", block::gen::t_BlockLimits) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_OutMsg.unpack(cs_ref.write(), record));
-// 	}
+// struct FullMsgForwardPrices : BaseFullCell<block::gen::MsgForwardPrices> {
+//     FullMsgForwardPrices() : BaseFullCell("MsgForwardPrices", block::gen::t_MsgForwardPrices) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_OutMsg.cell_unpack(std::move(cell_ref), record));
+// struct FullCatchainConfig : BaseFullCell<block::gen::CatchainConfig> {
+//     FullCatchainConfig() : BaseFullCell("CatchainConfig", block::gen::t_CatchainConfig) {}
+// };
 
-// 	}
+// struct FullConsensusConfig : BaseFullCell<block::gen::ConsensusConfig> {
+//     FullConsensusConfig() : BaseFullCell("ConsensusConfig", block::gen::t_ConsensusConfig) {}
 // };
 
-struct FullEnqueuedMsg
-{
-	EnqueuedMsg::Record record;
+// struct FullValidatorTempKey : BaseFullCell<block::gen::ValidatorTempKey> {
+//     FullValidatorTempKey() : BaseFullCell("ValidatorTempKey", block::gen::t_ValidatorTempKey) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_EnqueuedMsg.unpack(cs_ref.write(), record));
-	}
+// struct FullValidatorSignedTempKey : BaseFullCell<block::gen::ValidatorSignedTempKey> {
+//     FullValidatorSignedTempKey() : BaseFullCell("ValidatorSignedTempKey", block::gen::t_ValidatorSignedTempKey) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_EnqueuedMsg.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullMisbehaviourPunishmentConfig : BaseFullCell<block::gen::MisbehaviourPunishmentConfig> {
+//     FullMisbehaviourPunishmentConfig() : BaseFullCell("MisbehaviourPunishmentConfig", block::gen::t_MisbehaviourPunishmentConfig) {}
+// };
 
-struct FullOutMsgDescr
-{
-	OutMsgDescr::Record record;
+// struct FullSizeLimitsConfig : BaseFullCell<block::gen::SizeLimitsConfig> {
+//     FullSizeLimitsConfig() : BaseFullCell("SizeLimitsConfig", block::gen::t_SizeLimitsConfig) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OutMsgDescr.unpack(cs_ref.write(), record));
-	}
+// struct FullSuspendedAddressList : BaseFullCell<block::gen::SuspendedAddressList> {
+//     FullSuspendedAddressList() : BaseFullCell("SuspendedAddressList", block::gen::t_SuspendedAddressList) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OutMsgDescr.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullPrecompiledSmc : BaseFullCell<block::gen::PrecompiledSmc> {
+//     FullPrecompiledSmc() : BaseFullCell("PrecompiledSmc", block::gen::t_PrecompiledSmc) {}
+// };
 
-struct FullOutMsgQueue
-{
-	OutMsgQueue::Record record;
+// struct FullPrecompiledContractsConfig : BaseFullCell<block::gen::PrecompiledContractsConfig> {
+//     FullPrecompiledContractsConfig() : BaseFullCell("PrecompiledContractsConfig", block::gen::t_PrecompiledContractsConfig) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OutMsgQueue.unpack(cs_ref.write(), record));
-	}
+// struct FullOracleBridgeParams : BaseFullCell<block::gen::OracleBridgeParams> {
+//     FullOracleBridgeParams() : BaseFullCell("OracleBridgeParams", block::gen::t_OracleBridgeParams) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OutMsgQueue.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullJettonBridgePrices : BaseFullCell<block::gen::JettonBridgePrices> {
+//     FullJettonBridgePrices() : BaseFullCell("JettonBridgePrices", block::gen::t_JettonBridgePrices) {}
+// };
 
-struct FullProcessedUpto
-{
-	ProcessedUpto::Record record;
+// struct FullJettonBridgeParams : BaseFullCell<block::gen::JettonBridgeParams> {
+//     FullJettonBridgeParams() : BaseFullCell("JettonBridgeParams", block::gen::t_JettonBridgeParams) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ProcessedUpto.unpack(cs_ref.write(), record));
-	}
+// // struct FullConfigParam : BaseFullCell<block::gen::ConfigParam> {
+// //     FullConfigParam() : BaseFullCell("ConfigParam", block::gen::t_ConfigParam) {}
+// // };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ProcessedUpto.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullBlockSignaturesPure : BaseFullCell<block::gen::BlockSignaturesPure> {
+//     FullBlockSignaturesPure() : BaseFullCell("BlockSignaturesPure", block::gen::t_BlockSignaturesPure) {}
+// };
 
-struct FullProcessedInfo
-{
-	ProcessedInfo::Record record;
+// struct FullBlockSignatures : BaseFullCell<block::gen::BlockSignatures> {
+//     FullBlockSignatures() : BaseFullCell("BlockSignatures", block::gen::t_BlockSignatures) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ProcessedInfo.unpack(cs_ref.write(), record));
-	}
+// struct FullBlockProof : BaseFullCell<block::gen::BlockProof> {
+//     FullBlockProof() : BaseFullCell("BlockProof", block::gen::t_BlockProof) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ProcessedInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// // struct FullProofChain : BaseFullCell<block::gen::ProofChain> {
+// //     FullProofChain() : BaseFullCell("ProofChain", block::gen::t_ProofChain) {}
+// // };
 
-struct FullIhrPendingSince
-{
-	IhrPendingSince::Record record;
+// struct FullTopBlockDescr : BaseFullCell<block::gen::TopBlockDescr> {
+//     FullTopBlockDescr() : BaseFullCell("TopBlockDescr", block::gen::t_TopBlockDescr) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_IhrPendingSince.unpack(cs_ref.write(), record));
-	}
+// struct FullTopBlockDescrSet : BaseFullCell<block::gen::TopBlockDescrSet> {
+//     FullTopBlockDescrSet() : BaseFullCell("TopBlockDescrSet", block::gen::t_TopBlockDescrSet) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_IhrPendingSince.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullProducerInfo : BaseFullCell<block::gen::ProducerInfo> {
+//     FullProducerInfo() : BaseFullCell("ProducerInfo", block::gen::t_ProducerInfo) {}
+// };
 
-struct FullIhrPendingInfo
-{
-	IhrPendingInfo::Record record;
+// struct FullComplaintDescr : BaseFullCell<block::gen::ComplaintDescr> {
+//     FullComplaintDescr() : BaseFullCell("ComplaintDescr", block::gen::t_ComplaintDescr) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_IhrPendingInfo.unpack(cs_ref.write(), record));
-	}
+// struct FullValidatorComplaint : BaseFullCell<block::gen::ValidatorComplaint> {
+//     FullValidatorComplaint() : BaseFullCell("ValidatorComplaint", block::gen::t_ValidatorComplaint) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_IhrPendingInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullValidatorComplaintStatus : BaseFullCell<block::gen::ValidatorComplaintStatus> {
+//     FullValidatorComplaintStatus() : BaseFullCell("ValidatorComplaintStatus", block::gen::t_ValidatorComplaintStatus) {}
+// };
 
-struct FullAccountDispatchQueue
-{
-	AccountDispatchQueue::Record record;
+// struct FullVmCellSlice : BaseFullCell<block::gen::VmCellSlice> {
+//     FullVmCellSlice() : BaseFullCell("VmCellSlice", block::gen::t_VmCellSlice) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_AccountDispatchQueue.unpack(cs_ref.write(), record));
-	}
+// // struct FullVmTupleRef : BaseFullCell<block::gen::VmTupleRef> {
+// //     FullVmTupleRef() : BaseFullCell("VmTupleRef", block::gen::t_VmTupleRef) {}
+// // };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_AccountDispatchQueue.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// // struct FullVmTuple : BaseFullCell<block::gen::VmTuple> {
+// //     FullVmTuple() : BaseFullCell("VmTuple", block::gen::t_VmTuple) {}
+// // };
 
-struct FullDispatchQueue
-{
-	DispatchQueue::Record record;
+// struct FullVmStackValue : BaseFullCell<block::gen::VmStackValue> {
+//     FullVmStackValue() : BaseFullCell("VmStackValue", block::gen::t_VmStackValue) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_DispatchQueue.unpack(cs_ref.write(), record));
-	}
+// struct FullVmStack : BaseFullCell<block::gen::VmStack> {
+//     FullVmStack() : BaseFullCell("VmStack", block::gen::t_VmStack) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_DispatchQueue.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// // struct FullVmStackList : BaseFullCell<block::gen::VmStackList> {
+// //     FullVmStackList() : BaseFullCell("VmStackList", block::gen::t_VmStackList) {}
+// // };
 
-struct FullOutMsgQueueExtra
-{
-	OutMsgQueueExtra::Record record;
+// struct FullVmSaveList : BaseFullCell<block::gen::VmSaveList> {
+//     FullVmSaveList() : BaseFullCell("VmSaveList", block::gen::t_VmSaveList) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OutMsgQueueExtra.unpack(cs_ref.write(), record));
-	}
+// struct FullVmGasLimits_aux : BaseFullCell<block::gen::VmGasLimits_aux> {
+//     FullVmGasLimits_aux() : BaseFullCell("VmGasLimits_aux", block::gen::t_VmGasLimits_aux) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OutMsgQueueExtra.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullVmGasLimits : BaseFullCell<block::gen::VmGasLimits> {
+//     FullVmGasLimits() : BaseFullCell("VmGasLimits", block::gen::t_VmGasLimits) {}
+// };
 
-struct FullOutMsgQueueInfo
-{
-	OutMsgQueueInfo::Record record;
+// struct FullVmLibraries : BaseFullCell<block::gen::VmLibraries> {
+//     FullVmLibraries() : BaseFullCell("VmLibraries", block::gen::t_VmLibraries) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OutMsgQueueInfo.unpack(cs_ref.write(), record));
-	}
+// struct FullVmControlData : BaseFullCell<block::gen::VmControlData> {
+//     FullVmControlData() : BaseFullCell("VmControlData", block::gen::t_VmControlData) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OutMsgQueueInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullVmCont : BaseFullCell<block::gen::VmCont> {
+//     FullVmCont() : BaseFullCell("VmCont", block::gen::t_VmCont) {}
+// };
 
-struct FullStorageUsed
-{
-	StorageUsed::Record record;
+// struct FullDNS_RecordSet : BaseFullCell<block::gen::DNS_RecordSet> {
+//     FullDNS_RecordSet() : BaseFullCell("DNS_RecordSet", block::gen::t_DNS_RecordSet) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_StorageUsed.unpack(cs_ref.write(), record));
-	}
+// // struct FullTextChunkRef : BaseFullCell<block::gen::TextChunkRef> {
+// //     FullTextChunkRef() : BaseFullCell("TextChunkRef", block::gen::t_TextChunkRef) {}
+// // };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_StorageUsed.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// // struct FullTextChunks : BaseFullCell<block::gen::TextChunks> {
+// //     FullTextChunks() : BaseFullCell("TextChunks", block::gen::t_TextChunks) {}
+// // };
 
-struct FullStorageUsedShort
-{
-	StorageUsedShort::Record record;
+// struct FullText : BaseFullCell<block::gen::Text> {
+//     FullText() : BaseFullCell("Text", block::gen::t_Text) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_StorageUsedShort.unpack(cs_ref.write(), record));
-	}
+// struct FullProtoList : BaseFullCell<block::gen::ProtoList> {
+//     FullProtoList() : BaseFullCell("ProtoList", block::gen::t_ProtoList) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_StorageUsedShort.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullProtocol : BaseFullCell<block::gen::Protocol> {
+//     FullProtocol() : BaseFullCell("Protocol", block::gen::t_Protocol) {}
+// };
 
-struct FullStorageInfo
-{
-	StorageInfo::Record record;
+// struct FullSmcCapList : BaseFullCell<block::gen::SmcCapList> {
+//     FullSmcCapList() : BaseFullCell("SmcCapList", block::gen::t_SmcCapList) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_StorageInfo.unpack(cs_ref.write(), record));
-	}
+// struct FullSmcCapability : BaseFullCell<block::gen::SmcCapability> {
+//     FullSmcCapability() : BaseFullCell("SmcCapability", block::gen::t_SmcCapability) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_StorageInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullDNSRecord : BaseFullCell<block::gen::DNSRecord> {
+//     FullDNSRecord() : BaseFullCell("DNSRecord", block::gen::t_DNSRecord) {}
+// };
 
-// struct FullAccount {
-//     Account::Record record;
+// struct FullChanConfig : BaseFullCell<block::gen::ChanConfig> {
+//     FullChanConfig() : BaseFullCell("ChanConfig", block::gen::t_ChanConfig) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_Account.unpack(cs_ref.write(), record));
-// 	}
+// struct FullChanState : BaseFullCell<block::gen::ChanState> {
+//     FullChanState() : BaseFullCell("ChanState", block::gen::t_ChanState) {}
+// };
 
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_Account.cell_unpack(std::move(cell_ref), record));
+// struct FullChanPromise : BaseFullCell<block::gen::ChanPromise> {
+//     FullChanPromise() : BaseFullCell("ChanPromise", block::gen::t_ChanPromise) {}
+// };
 
-// 	}
+// struct FullChanSignedPromise : BaseFullCell<block::gen::ChanSignedPromise> {
+//     FullChanSignedPromise() : BaseFullCell("ChanSignedPromise", block::gen::t_ChanSignedPromise) {}
 // };
 
-struct FullAccountStorage
-{
-	AccountStorage::Record record;
+// struct FullChanMsg : BaseFullCell<block::gen::ChanMsg> {
+//     FullChanMsg() : BaseFullCell("ChanMsg", block::gen::t_ChanMsg) {}
+// };
 
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_AccountStorage.unpack(cs_ref.write(), record));
-	}
+// struct FullChanSignedMsg : BaseFullCell<block::gen::ChanSignedMsg> {
+//     FullChanSignedMsg() : BaseFullCell("ChanSignedMsg", block::gen::t_ChanSignedMsg) {}
+// };
 
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_AccountStorage.cell_unpack(std::move(cell_ref), record));
-	}
-};
+// struct FullChanOp : BaseFullCell<block::gen::ChanOp> {
+//     FullChanOp() : BaseFullCell("ChanOp", block::gen::t_ChanOp) {}
+// };
 
-// struct FullAccountState {
-//     AccountState::Record record;
+// struct FullChanData : BaseFullCell<block::gen::ChanData> {
+//     FullChanData() : BaseFullCell("ChanData", block::gen::t_ChanData) {}
+// };
 
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_AccountState.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_AccountState.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullAccountStatus {
-//     AccountStatus::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_AccountStatus.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_AccountStatus.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullShardAccount
-{
-	ShardAccount::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardAccount.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardAccount.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullDepthBalanceInfo
-{
-	DepthBalanceInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_DepthBalanceInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_DepthBalanceInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullShardAccounts
-{
-	ShardAccounts::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardAccounts.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardAccounts.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullTransaction_aux
-{
-	Transaction_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Transaction_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Transaction_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullTransaction
-{
-	Transaction::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Transaction.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Transaction.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullMERKLE_UPDATE {
-//     MERKLE_UPDATE::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MERKLE_UPDATE.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MERKLE_UPDATE.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullHASH_UPDATE {
-//     HASH_UPDATE::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_HASH_UPDATE.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_HASH_UPDATE.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullMERKLE_PROOF {
-//     MERKLE_PROOF::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_MERKLE_PROOF.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_MERKLE_PROOF.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullAccountBlock
-{
-	AccountBlock::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_AccountBlock.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_AccountBlock.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullShardAccountBlocks
-{
-	ShardAccountBlocks::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardAccountBlocks.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardAccountBlocks.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullTrStoragePhase
-{
-	TrStoragePhase::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TrStoragePhase.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TrStoragePhase.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullAccStatusChange {
-//     AccStatusChange::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_AccStatusChange.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_AccStatusChange.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullTrCreditPhase
-{
-	TrCreditPhase::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TrCreditPhase.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TrCreditPhase.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullTrComputePhase_aux
-{
-	TrComputePhase_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TrComputePhase_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TrComputePhase_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullTrComputePhase {
-//     TrComputePhase::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_TrComputePhase.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_TrComputePhase.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullComputeSkipReason {
-//     ComputeSkipReason::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ComputeSkipReason.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ComputeSkipReason.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullTrActionPhase
-{
-	TrActionPhase::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TrActionPhase.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TrActionPhase.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullTrBouncePhase {
-//     TrBouncePhase::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_TrBouncePhase.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_TrBouncePhase.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullSplitMergeInfo
-{
-	SplitMergeInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_SplitMergeInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_SplitMergeInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullTransactionDescr {
-//     TransactionDescr::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_TransactionDescr.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_TransactionDescr.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullSmartContractInfo
-{
-	SmartContractInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_SmartContractInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_SmartContractInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullOutList {
-//     OutList::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_OutList.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_OutList.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullLibRef {
-//     LibRef::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_LibRef.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_LibRef.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullOutAction {
-//     OutAction::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_OutAction.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_OutAction.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullOutListNode
-{
-	OutListNode::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OutListNode.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OutListNode.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullShardIdent
-{
-	ShardIdent::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardIdent.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardIdent.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullExtBlkRef
-{
-	ExtBlkRef::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ExtBlkRef.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ExtBlkRef.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlockIdExt
-{
-	BlockIdExt::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockIdExt.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockIdExt.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlkMasterInfo
-{
-	BlkMasterInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlkMasterInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlkMasterInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullShardStateUnsplit_aux
-{
-	ShardStateUnsplit_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardStateUnsplit_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardStateUnsplit_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullShardStateUnsplit
-{
-	ShardStateUnsplit::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardStateUnsplit.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardStateUnsplit.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullShardState {
-//     ShardState::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ShardState.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ShardState.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullLibDescr
-{
-	LibDescr::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_LibDescr.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_LibDescr.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlockInfo
-{
-	BlockInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullBlkPrevInfo {
-//     BlkPrevInfo::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_BlkPrevInfo.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_BlkPrevInfo.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullTYPE_1657
-{
-	TYPE_1657::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TYPE_1657.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TYPE_1657.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullTYPE_1658
-{
-	TYPE_1658::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TYPE_1658.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TYPE_1658.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullValueFlow {
-//     ValueFlow::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ValueFlow.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ValueFlow.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullBinTree {
-//     BinTree::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_BinTree.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_BinTree.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullFutureSplitMerge {
-//     FutureSplitMerge::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_FutureSplitMerge.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_FutureSplitMerge.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullShardDescr_aux
-{
-	ShardDescr_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardDescr_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardDescr_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullShardDescr {
-//     ShardDescr::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ShardDescr.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ShardDescr.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullShardHashes
-{
-	ShardHashes::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardHashes.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardHashes.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullBinTreeAug {
-//     BinTreeAug::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_BinTreeAug.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_BinTreeAug.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullShardFeeCreated
-{
-	ShardFeeCreated::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardFeeCreated.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardFeeCreated.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullShardFees
-{
-	ShardFees::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ShardFees.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ShardFees.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullConfigParams
-{
-	ConfigParams::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ConfigParams.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ConfigParams.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullValidatorInfo
-{
-	ValidatorInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ValidatorInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ValidatorInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullValidatorBaseInfo
-{
-	ValidatorBaseInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ValidatorBaseInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ValidatorBaseInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullKeyMaxLt
-{
-	KeyMaxLt::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_KeyMaxLt.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_KeyMaxLt.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullKeyExtBlkRef
-{
-	KeyExtBlkRef::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_KeyExtBlkRef.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_KeyExtBlkRef.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullOldMcBlocksInfo
-{
-	OldMcBlocksInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OldMcBlocksInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OldMcBlocksInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullCounters
-{
-	Counters::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Counters.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Counters.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullCreatorStats
-{
-	CreatorStats::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_CreatorStats.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_CreatorStats.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullBlockCreateStats {
-//     BlockCreateStats::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_BlockCreateStats.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_BlockCreateStats.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullMcStateExtra_aux
-{
-	McStateExtra_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_McStateExtra_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_McStateExtra_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullMcStateExtra
-{
-	McStateExtra::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_McStateExtra.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_McStateExtra.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullSigPubKey
-{
-	SigPubKey::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_SigPubKey.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_SigPubKey.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullCryptoSignatureSimple
-{
-	CryptoSignatureSimple::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_CryptoSignatureSimple.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_CryptoSignatureSimple.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullCryptoSignaturePair
-{
-	CryptoSignaturePair::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_CryptoSignaturePair.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_CryptoSignaturePair.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullCertificate
-{
-	Certificate::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Certificate.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Certificate.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullCertificateEnv
-{
-	CertificateEnv::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_CertificateEnv.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_CertificateEnv.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullSignedCertificate
-{
-	SignedCertificate::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_SignedCertificate.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_SignedCertificate.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullCryptoSignature {
-//     CryptoSignature::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_CryptoSignature.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_CryptoSignature.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullMcBlockExtra_aux
-{
-	McBlockExtra_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_McBlockExtra_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_McBlockExtra_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullMcBlockExtra
-{
-	McBlockExtra::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_McBlockExtra.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_McBlockExtra.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullValidatorDescr {
-//     ValidatorDescr::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ValidatorDescr.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ValidatorDescr.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullValidatorSet {
-//     ValidatorSet::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ValidatorSet.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ValidatorSet.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullBurningConfig
-{
-	BurningConfig::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BurningConfig.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BurningConfig.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullGlobalVersion
-{
-	GlobalVersion::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_GlobalVersion.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_GlobalVersion.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullConfigProposalSetup
-{
-	ConfigProposalSetup::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ConfigProposalSetup.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ConfigProposalSetup.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullConfigVotingSetup
-{
-	ConfigVotingSetup::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ConfigVotingSetup.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ConfigVotingSetup.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullConfigProposal
-{
-	ConfigProposal::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ConfigProposal.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ConfigProposal.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullConfigProposalStatus
-{
-	ConfigProposalStatus::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ConfigProposalStatus.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ConfigProposalStatus.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullWorkchainFormat {
-//     WorkchainFormat::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_WorkchainFormat.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_WorkchainFormat.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullWcSplitMergeTimings
-{
-	WcSplitMergeTimings::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_WcSplitMergeTimings.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_WcSplitMergeTimings.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullWorkchainDescr {
-//     WorkchainDescr::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_WorkchainDescr.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_WorkchainDescr.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullComplaintPricing
-{
-	ComplaintPricing::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ComplaintPricing.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ComplaintPricing.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlockCreateFees
-{
-	BlockCreateFees::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockCreateFees.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockCreateFees.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullStoragePrices
-{
-	StoragePrices::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_StoragePrices.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_StoragePrices.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullGasLimitsPrices {
-//     GasLimitsPrices::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_GasLimitsPrices.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_GasLimitsPrices.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullParamLimits
-{
-	ParamLimits::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ParamLimits.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ParamLimits.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlockLimits
-{
-	BlockLimits::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockLimits.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockLimits.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullMsgForwardPrices
-{
-	MsgForwardPrices::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_MsgForwardPrices.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_MsgForwardPrices.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullCatchainConfig {
-//     CatchainConfig::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_CatchainConfig.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_CatchainConfig.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullConsensusConfig {
-//     ConsensusConfig::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ConsensusConfig.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ConsensusConfig.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullValidatorTempKey
-{
-	ValidatorTempKey::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ValidatorTempKey.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ValidatorTempKey.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullValidatorSignedTempKey
-{
-	ValidatorSignedTempKey::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ValidatorSignedTempKey.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ValidatorSignedTempKey.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullMisbehaviourPunishmentConfig
-{
-	MisbehaviourPunishmentConfig::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_MisbehaviourPunishmentConfig.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_MisbehaviourPunishmentConfig.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullSizeLimitsConfig {
-//     SizeLimitsConfig::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_SizeLimitsConfig.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_SizeLimitsConfig.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullSuspendedAddressList
-{
-	SuspendedAddressList::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_SuspendedAddressList.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_SuspendedAddressList.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullPrecompiledSmc
-{
-	PrecompiledSmc::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_PrecompiledSmc.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_PrecompiledSmc.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullPrecompiledContractsConfig
-{
-	PrecompiledContractsConfig::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_PrecompiledContractsConfig.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_PrecompiledContractsConfig.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullOracleBridgeParams
-{
-	OracleBridgeParams::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_OracleBridgeParams.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_OracleBridgeParams.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullJettonBridgePrices
-{
-	JettonBridgePrices::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_JettonBridgePrices.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_JettonBridgePrices.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullJettonBridgeParams {
-//     JettonBridgeParams::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_JettonBridgeParams.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_JettonBridgeParams.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullConfigParam {
-//     ConfigParam::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ConfigParam.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ConfigParam.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullBlockSignaturesPure
-{
-	BlockSignaturesPure::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockSignaturesPure.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockSignaturesPure.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlockSignatures
-{
-	BlockSignatures::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockSignatures.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockSignatures.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullBlockProof
-{
-	BlockProof::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_BlockProof.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_BlockProof.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullProofChain {
-//     ProofChain::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ProofChain.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ProofChain.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullTopBlockDescr
-{
-	TopBlockDescr::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TopBlockDescr.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TopBlockDescr.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullTopBlockDescrSet
-{
-	TopBlockDescrSet::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_TopBlockDescrSet.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_TopBlockDescrSet.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullProducerInfo
-{
-	ProducerInfo::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ProducerInfo.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ProducerInfo.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullComplaintDescr {
-//     ComplaintDescr::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ComplaintDescr.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ComplaintDescr.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullValidatorComplaint
-{
-	ValidatorComplaint::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ValidatorComplaint.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ValidatorComplaint.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullValidatorComplaintStatus
-{
-	ValidatorComplaintStatus::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ValidatorComplaintStatus.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ValidatorComplaintStatus.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullVmCellSlice
-{
-	VmCellSlice::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmCellSlice.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmCellSlice.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullVmTupleRef {
-//     VmTupleRef::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VmTupleRef.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VmTupleRef.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullVmTuple {
-//     VmTuple::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VmTuple.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VmTuple.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullVmStackValue {
-//     VmStackValue::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VmStackValue.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VmStackValue.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullVmStack
-{
-	VmStack::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmStack.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmStack.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullVmStackList {
-//     VmStackList::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VmStackList.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VmStackList.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullVmSaveList
-{
-	VmSaveList::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmSaveList.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmSaveList.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullVmGasLimits_aux
-{
-	VmGasLimits_aux::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmGasLimits_aux.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmGasLimits_aux.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullVmGasLimits
-{
-	VmGasLimits::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmGasLimits.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmGasLimits.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullVmLibraries
-{
-	VmLibraries::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmLibraries.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmLibraries.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullVmControlData
-{
-	VmControlData::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_VmControlData.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_VmControlData.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullVmCont {
-//     VmCont::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_VmCont.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_VmCont.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullDNS_RecordSet
-{
-	DNS_RecordSet::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_DNS_RecordSet.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_DNS_RecordSet.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullTextChunkRef {
-//     TextChunkRef::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_TextChunkRef.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_TextChunkRef.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullTextChunks {
-//     TextChunks::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_TextChunks.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_TextChunks.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullText
-{
-	Text::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Text.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Text.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullProtoList {
-//     ProtoList::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ProtoList.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ProtoList.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullProtocol
-{
-	Protocol::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_Protocol.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_Protocol.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullSmcCapList {
-//     SmcCapList::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_SmcCapList.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_SmcCapList.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullSmcCapability {
-//     SmcCapability::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_SmcCapability.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_SmcCapability.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-// struct FullDNSRecord {
-//     DNSRecord::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_DNSRecord.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_DNSRecord.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullChanConfig
-{
-	ChanConfig::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ChanConfig.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ChanConfig.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullChanState {
-//     ChanState::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ChanState.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ChanState.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullChanPromise
-{
-	ChanPromise::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ChanPromise.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ChanPromise.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullChanSignedPromise
-{
-	ChanSignedPromise::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ChanSignedPromise.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ChanSignedPromise.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-// struct FullChanMsg {
-//     ChanMsg::Record record;
-
-//     void unpack(Ref<vm::CellSlice> cs_ref) {
-// 		CHECK(t_ChanMsg.unpack(cs_ref.write(), record));
-// 	}
-
-// 	void cell_unpack(Ref<vm::Cell> cell_ref) {
-// 		CHECK(t_ChanMsg.cell_unpack(std::move(cell_ref), record));
-
-// 	}
-// };
-
-struct FullChanSignedMsg
-{
-	ChanSignedMsg::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ChanSignedMsg.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ChanSignedMsg.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullChanOp
-{
-	ChanOp::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ChanOp.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ChanOp.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-struct FullChanData
-{
-	ChanData::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref)
-	{
-		CHECK(t_ChanData.unpack(cs_ref.write(), record));
-	}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref)
-	{
-		CHECK(t_ChanData.cell_unpack(std::move(cell_ref), record));
-	}
-};
-
-/// gen end
-
-struct FullVarUInteger16
-{
-	VarUInteger::Record record;
-
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullVarUInteger16.unpack");
-		CHECK(t_VarUInteger_16.unpack(cs_ref.write(), record));
-	}
-};
-
-struct FullGrams
-{
-	Grams::Record record;
-
-	FullVarUInteger16 amount;
-
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullGrams.unpack");
-		CHECK(t_Grams.unpack(cs_ref.write(), record));
-
-		amount.unpack(record.amount, indent + 1);
-	}
-};
-
-struct FullCurrencyCollection
-{
-	CurrencyCollection::Record record;
-
-	FullGrams grams;
-	FullExtraCurrencyCollection other;
-
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullCurrencyCollection.unpack");
-		CHECK(t_CurrencyCollection.unpack(cs_ref.write(), record));
-
-		grams.unpack(record.grams, indent + 1);
-		other.unpack(record.other, indent + 1);
-	}
-};
-
-struct FullImportFees
-{
-	ImportFees::Record record;
-
-	FullGrams fees_collected;
-	FullCurrencyCollection value_imported;
-
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		CHECK(t_ImportFees.unpack(cs_ref.write(), record));
-
-		fees_collected.unpack(record.fees_collected, indent + 1);
-		value_imported.unpack(record.value_imported, indent + 1);
-	}
-};
 
-template <class TValue, class TAug>
+struct FullImportFees;
+template <class TValue, class TExtra>
 struct FullHashmapAug;
 
-template <class TValue, class TAug>
-struct FullHashmapAugNode
+struct FullCurrencyCollection : BaseFullCell<CurrencyCollection>, AddValues<block::tlb::CurrencyCollection>
+{
+	FullCurrencyCollection() : BaseFullCell("CurrencyCollection", t_CurrencyCollection), AddValues(block::tlb::t_CurrencyCollection) {}
+};
+
+
+template <class TValue, class TExtra>
+struct FullHashmapAugNode : BaseFullCell<block::gen::HashmapAugNode>
 {
 	/*
 
@@ -3167,80 +1106,118 @@ struct FullHashmapAugNode
 
 	*/
 
-	HashmapAugNode::Record_ahmn_leaf record_ahmn_leaf;
-	HashmapAugNode::Record_ahmn_fork record_ahmn_fork;
-
-	HashmapAugNode type;
-
 	int tag = -1;
-	Ref<FullHashmapAug<TValue, TAug>> left;
-	Ref<FullHashmapAug<TValue, TAug>> right;
+	int n = -1;
+	Ref<FullHashmapAug<TValue, TExtra>> left;
+	Ref<FullHashmapAug<TValue, TExtra>> right;
 
 	TValue value;
-	TAug extra;
+	TExtra extra;
 
-	FullHashmapAugNode(int m, const TLB &X, const TLB &Y) : type(m, X, Y) {}
+	FullHashmapAugNode(int m,  const TLB &X, const TLB &Y) : BaseFullCell("HashmapAugNode", block::gen::HashmapAugNode(m, X, Y)) {}
 
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullHashmapAugNode.unpack");
-		
-		tag = type.check_tag(cs_ref.write());
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == block::gen::HashmapAugNode::ahmn_leaf || tag == block::gen::HashmapAugNode::ahmn_fork);
 
-		// trace_parse_r(indent, "FullHashmapAugNode.m") << type.m_ << std::endl;
-
-		if (tag == HashmapAugNode::ahmn_leaf)
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
 		{
-			// trace_parse(indent, "FullHashmapAugNode.unpack leaf");
-
-			CHECK(type.unpack(cs_ref.write(), record_ahmn_leaf));
-
-			auto cs = record_ahmn_leaf.extra.write();
-			// trace_parse_r(indent, "HashmapAugNode::ahmn_leaf: ") << cs.data_bits().to_hex(cs.size()) << std::endl;
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
-
-			value.unpack(record_ahmn_leaf.value, indent + 1);
-			extra.unpack(record_ahmn_leaf.extra, indent + 1);
-
-			(td::BitPtr{const_cast<unsigned char*>(cs.data()), (int)cs.cur_pos()}).fill(0, cs.size());
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
-		}
-		else if (tag == HashmapAugNode::ahmn_fork)
-		{
-			// trace_parse(indent, "FullHashmapAugNode.unpack fork");
-			CHECK(type.unpack(cs_ref.write(), record_ahmn_fork));
-
-			auto cs = record_ahmn_fork.extra.write();
-			// trace_parse_r(indent, "HashmapAugNode::ahmn_fork: ") << cs.data_bits().to_hex(cs.size()) << std::endl;
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
-
-			if (record_ahmn_fork.left.not_null())
-			{
-				left = Ref<FullHashmapAug<TValue, TAug>>(true, type.m_ - 1, type.X_, type.Y_);
-				// trace_parse(indent, "FullHashmapAugNode.unpack left");
-				left.write().cell_unpack(record_ahmn_fork.left, indent + 1);
-			}
-			if (record_ahmn_fork.right.not_null())
-			{
-				right = Ref<FullHashmapAug<TValue, TAug>>(true, type.m_ - 1, type.X_, type.Y_);
-				// trace_parse(indent, "FullHashmapAugNode.unpack right");
-				right.write().cell_unpack(record_ahmn_fork.right, indent + 1);
-			}
-
-			extra.unpack(record_ahmn_fork.extra, indent + 1);
-
-			(td::BitPtr{const_cast<unsigned char*>(cs.data()), (int)cs.cur_pos()}).fill(0, cs.size());
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
+			// minify-remove
+			CHECK(type.m_ == 0);
+			extra.unpack_std(ctx, cs, indent + 1);
+			value.unpack_std(ctx, cs, indent + 1, true);
 		}
 		else
 		{
-			throw std::runtime_error("not supported");
+			int n;
+			add_r1(n, 1, type.m_);
+
+			left = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			left.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+			right = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			right.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+			extra.unpack_std(ctx, cs, indent + 1);
+		}
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			value.pack_opt(ctx, cb, indent + 1);
+		}
+		else {
+			int n;
+			CHECK(add_r1(n, 1, type.m_));
+			cb.store_ref(left.write().make_opt_cell(ctx, indent + 1));
+			cb.store_ref(right.write().make_opt_cell(ctx, indent + 1));
+		}
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			value.unpack_opt(ctx, cs, indent + 1);
+			auto extra_cs = value.calc_aug_data();
+			extra.unpack_opt(ctx, extra_cs, indent + 1, true);
+			// minify-remove
+			CHECK(cs.empty_ext());
+		}
+		else
+		{
+			int n;
+			add_r1(n, 1, type.m_);
+
+			left = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			left.write().cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+
+			right = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			right.write().cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+
+			auto left_extra_cs = to_cs(left.write().node.extra.make_std_cell(ctx));
+			auto right_extra_cs = to_cs(right.write().node.extra.make_std_cell(ctx));
+
+			auto extra_cs = extra.add_values(left_extra_cs, right_extra_cs);
+			extra.unpack_opt(ctx, extra_cs, indent + 1, true);
+		}
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			extra.pack_std(ctx, cb, indent + 1);
+			value.pack_std(ctx, cb, indent + 1);
+		}
+		else {
+			int n;
+			CHECK(add_r1(n, 1, type.m_));
+			cb.store_ref(left.write().make_std_cell(ctx, indent + 1));
+			cb.store_ref(right.write().make_std_cell(ctx, indent + 1));
+			extra.pack_std(ctx, cb, indent + 1);
 		}
 	}
 };
 
-template <class TValue, class TAug>
-struct FullHashmapAug : public td::CntObject
+template <class TValue, class TExtra>
+struct FullHashmapAug : BaseFullCell<block::gen::HashmapAug>, td::CntObject
 {
 	/*
 
@@ -3255,37 +1232,49 @@ struct FullHashmapAug : public td::CntObject
 	= HashmapAug n X Y;
 
 	*/
-	HashmapAug::Record record;
+	block::gen::HashmapAug::Record record;
 
-	const HashmapAug type;
+	FullHashmapAugNode<TValue, TExtra> node;
 
-	FullHashmapAugNode<TValue, TAug> node;
+	FullHashmapAug(int n, const TLB &X, const TLB &Y) : BaseFullCell("HashmapAug", block::gen::HashmapAug(n, X, Y)), node(n, X, Y) {}
 
-	FullHashmapAug(int n, const TLB &X, const TLB &Y) : type(n, X, Y), node(n, X, Y) {}
-
-	void cell_unpack(Ref<vm::Cell> cell_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullHashmapAug.cell_unpack");
-		// trace_parse_r(indent, "FullHashmapAug.m=") << type.m_ << std::endl;
-		CHECK(type.cell_unpack(cell_ref, record));
-
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		CHECK(type.unpack(cs, record));
 		node.type.m_ = record.m;
+		node.unpack_std(ctx, record.node.write(), indent + 1);
+	}
 
-		node.unpack(record.node, indent + 1);
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		int l, m;
+		CHECK(
+				tlb::store_from(cb, HmLabel{type.m_}, record.label, l)
+      && add_r1(m, l, type.m_)
+		);
+		node.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		CHECK(
+			(record.n = type.m_) >= 0
+      && block::gen::HmLabel{type.m_}.fetch_to(cs, record.label, record.l)
+      && add_r1(record.m, record.l, type.m_)
+		);
+		node.type.m_ = record.m;
+		node.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		int l, m;
+		CHECK(
+				tlb::store_from(cb, block::gen::HmLabel{type.m_}, record.label, l)
+      && add_r1(m, l, type.m_)
+		);
+		node.pack_std(ctx, cb, indent + 1);
 	}
 };
 
-struct FullInMsgDescrXHM : FullHashmapAug<FullInMsg, FullImportFees>
-{
-	FullInMsgDescrXHM() : FullHashmapAug(256, t_InMsg, t_ImportFees)
-	{
-	}
-};
-
-const auto t_InMsgDescrX = t_HashmapAugE_256_InMsg_ImportFees;
-
-template <class TValue, class TAug>
-struct FullHashmapAugE
+template <class TValue, class TExtra>
+struct FullHashmapAugE : BaseFullCell<block::gen::HashmapAugE>
 {
 	/*
 	ahme_empty$0
@@ -3306,104 +1295,367 @@ struct FullHashmapAugE
 	= HashmapAugE n X Y;
 	*/
 
-	HashmapAugE::Record_ahme_empty record_ahme_empty;
-	HashmapAugE::Record_ahme_root record_ahme_root;
-
-	const HashmapAugE type;
+	block::gen::HashmapAugE::Record_ahme_root r;
 
 	int tag = -1;
-	FullHashmapAug<TValue, TAug> root;
-	TAug extra;
+	FullHashmapAug<TValue, TExtra> root;
+	TExtra extra;
 
-	FullHashmapAugE(int n, const TLB &X, const TLB &Y) : type(n, X, Y), root(n, X, Y) {}
+	FullHashmapAugE(int n, const TLB &X, const TLB &Y) : BaseFullCell("HashmapAugE", block::gen::HashmapAugE(n, X, Y)), root(n, X, Y) {}
 
-	void unpack(Ref<vm::CellSlice> cs_ref, int indent = 0)
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
 	{
-		tag = type.check_tag(cs_ref.write());
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == block::gen::HashmapAugE::ahme_empty || tag == block::gen::HashmapAugE::ahme_root)
+
+		if (tag == block::gen::HashmapAugE::ahme_empty)
+		{
+			CHECK(cs.fetch_ulong(1) == 0);
+			extra.unpack_std(ctx, cs, indent + 1);
+		}
+		else 
+		{
+			CHECK(type.unpack(cs, r));
+
+			root.cell_unpack_std(ctx, r.root, indent + 1);
+			extra.unpack_std(ctx, r.extra.write(), indent + 1);
+		}
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
+	{
+		// minify-remove
+		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
+
+		if (tag == HashmapAugE::ahme_empty) {
+			cb.store_long(0, 1);
+			extra.pack_opt(ctx, cb, indent + 1);
+		} else {
+			cb.store_long(1, 1).store_ref(root.make_opt_cell(ctx, indent + 1));
+			extra.pack_opt(ctx, cb, indent + 1);
+		}
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
 
 		if (tag == HashmapAugE::ahme_empty)
 		{
-			CHECK(type.unpack(cs_ref.write(), record_ahme_empty));
-
-			auto cs = record_ahme_empty.extra.write();
-			// trace_parse_r(indent, "HashmapAugE::empty: ") << cs.data_bits().to_hex(cs.size()) << std::endl;
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
-
-			extra.unpack(record_ahme_empty.extra, indent + 1);
-
-			(td::BitPtr{const_cast<unsigned char*>(cs.data()), (int)cs.cur_pos()}).fill(0, cs.size());
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
-		}
-		else if (tag == HashmapAugE::ahme_root)
-		{
-			CHECK(type.unpack(cs_ref.write(), record_ahme_root));
-
-			auto cs = record_ahme_root.extra.write();
-			// trace_parse_r(indent, "HashmapAugE::root: ") << cs.data_bits().to_hex(cs.size()) << std::endl;
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
-
-			root.cell_unpack(record_ahme_root.root, indent + 1);
-			extra.unpack(record_ahme_root.extra, indent + 1);
-
-			(td::BitPtr{const_cast<unsigned char*>(cs.data()), (int)cs.cur_pos()}).fill(0, cs.size());
-			std::cout << cs.data_bits().to_hex(cs.size()) << std::endl;
+			CHECK(cs.fetch_ulong(1) == 0);
+			extra.unpack_opt(ctx, cs, indent + 1);
 		}
 		else
 		{
-			throw std::runtime_error("not supported");
+			CHECK(cs.fetch_ulong(1) == 1 && (r.n = type.m_) >= 0);
+			auto root_ref = cs.fetch_ref();
+			root.cell_unpack_opt(ctx, root_ref, indent + 1);
+			extra = root.node.extra;
 		}
 	}
-};
 
-struct FullInMsgDescr
-{
-	block::gen::InMsgDescr::Record record;
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
 
-	FullHashmapAugE<FullInMsg, FullImportFees> x{256, t_InMsg, t_ImportFees};
-
-	void cell_unpack(Ref<vm::Cell> cell_ref, int indent = 0)
-	{
-		CHECK(t_InMsgDescr.cell_unpack(std::move(cell_ref), record));
-
-		x.unpack(record.x, indent + 1);
+		if (tag == HashmapAugE::ahme_empty) {
+			cb.store_long(0, 1);
+			extra.pack_std(ctx, cb, indent + 1);
+		} else {
+			cb.store_long(1, 1)
+			.store_ref(root.make_std_cell(ctx, indent + 1));
+			extra.pack_std(ctx, cb, indent + 1);
+		} 
 	}
 };
 
-struct FullBlockExtra
+struct FullOutMsgDescr : BaseFullCell<OutMsgDescr> {
+	FullHashmapAugE<FullOutMsg, FullCurrencyCollection> x{256, t_OutMsg, t_CurrencyCollection};
+
+	FullOutMsgDescr() : BaseFullCell("OutMsgDescr", t_OutMsgDescr) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		x.unpack_std(ctx, cs, indent + 1);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		x.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_std(ctx, cb, indent + 1);
+	}
+};
+
+// struct FullOutMsgQueue : BaseFullCell<block::gen::OutMsgQueue> {
+//     FullOutMsgQueue() : BaseFullCell("OutMsgQueue", block::gen::t_OutMsgQueue) {}
+// };
+
+/// gen end
+
+struct FullImportFees : BaseFullCell<ImportFees>, AddValues<block::tlb::ImportFees>
 {
+	FullImportFees() : BaseFullCell("ImportFees", t_ImportFees), AddValues(block::tlb::t_ImportFees) {}
+};
+
+struct FullInMsgDescr : BaseFullCell<InMsgDescr>
+{
+	FullHashmapAugE<FullInMsg, FullImportFees> x{256, t_InMsg, t_ImportFees};
+
+	FullInMsgDescr(): BaseFullCell("InMsgDescr", t_InMsgDescr) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		x.unpack_std(ctx, cs, indent + 1);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		x.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_std(ctx, cb, indent + 1);
+	}
+};
+
+struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
+{
+	/*
+
+	block_extra
+		in_msg_descr:^InMsgDescr
+		out_msg_descr:^OutMsgDescr
+		account_blocks:^ShardAccountBlocks
+		rand_seed:bits256
+		created_by:bits256
+		custom:(Maybe ^McBlockExtra)
+	= BlockExtra;
+
+	*/
 	block::gen::BlockExtra::Record record;
 
 	FullInMsgDescr in_msg_descr;
+	FullOutMsgDescr out_msg_descr;
 
-	void cell_unpack(Ref<vm::Cell> cell_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullBlockExtra.cell_unpack");
-		CHECK(t_BlockExtra.cell_unpack(std::move(cell_ref), record));
+	FullBlockExtra(): BaseFullCell("BlockExtra", block::gen::t_BlockExtra) {}
 
-		in_msg_descr.cell_unpack(record.in_msg_descr, indent + 1);
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		CHECK(type.unpack(cs, record));
+
+		in_msg_descr.cell_unpack_std(ctx, record.in_msg_descr, indent + 1);
+		out_msg_descr.cell_unpack_std(ctx, record.out_msg_descr, indent + 1);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_ref(in_msg_descr.make_opt_cell(ctx, indent + 1))
+				.store_ref(out_msg_descr.make_opt_cell(ctx, indent + 1))
+				.store_ref(record.account_blocks)
+				.store_bits(record.rand_seed.cbits(), 256)
+				.store_bits(record.created_by.cbits(), 256);
+		CHECK(block::gen::t_Maybe_Ref_McBlockExtra.store_from(cb, record.custom));
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		in_msg_descr.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+		out_msg_descr.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+
+		CHECK(
+      cs.fetch_ref_to(record.account_blocks)
+      && cs.fetch_bits_to(record.rand_seed.bits(), 256)
+      && cs.fetch_bits_to(record.created_by.bits(), 256)
+      && block::gen::t_Maybe_Ref_McBlockExtra.fetch_to(cs, record.custom)
+		);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_long(0x4a33f6fd, 32)
+				.store_ref(in_msg_descr.make_std_cell(ctx, indent + 1))
+				.store_ref(out_msg_descr.make_std_cell(ctx, indent + 1))
+				.store_ref(record.account_blocks)
+				.store_bits(record.rand_seed.cbits(), 256)
+				.store_bits(record.created_by.cbits(), 256);
+		CHECK(block::gen::t_Maybe_Ref_McBlockExtra.store_from(cb, record.custom));
 	}
 };
 
-struct FullBlock
+struct FullBlock : BaseFullCell<block::gen::Block>
 {
 	block::gen::Block::Record record;
 
 	FullBlockExtra extra;
 
-	void cell_unpack(Ref<vm::Cell> cell_ref, int indent = 0)
-	{
-		// trace_parse(indent, "FullBlock.cell_unpack");
-		CHECK(t_Block.cell_unpack(std::move(cell_ref), record));
+	FullBlock(): BaseFullCell("Block", block::gen::t_Block) {
 
-		extra.cell_unpack(record.extra, indent + 1);
+	}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		CHECK(type.unpack(cs, record));
+
+		extra.cell_unpack_std(ctx, record.extra, indent + 1, true);
+		// minify-remove
+		CHECK(cs.empty_ext());
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
+	{
+		// todo store bit (in case of main) or long for id;
+		cb.store_long(record.global_id, 32)
+				.store_ref(record.info)
+				.store_ref(record.value_flow)
+				.store_ref(record.state_update)
+				.store_ref(extra.make_opt_cell(ctx, indent + 1));
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		CHECK(
+			cs.fetch_int_to(32, record.global_id)
+      && cs.fetch_ref_to(record.info)
+      && cs.fetch_ref_to(record.value_flow)
+      && cs.fetch_ref_to(record.state_update)
+		);
+		extra.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1, true);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
+	{
+		cb.store_long(0x11ef55aa, 32)
+				.store_long(record.global_id, 32)
+				.store_ref(record.info)
+				.store_ref(record.value_flow)
+				.store_ref(record.state_update)
+				.store_ref(extra.make_std_cell(ctx, indent + 1));
 	}
 };
 
+// minify-remove:start
+
+template <class T>
+void do_print_delta(T actual, T prev) {
+	auto delta = static_cast<make_signed_t<T>>(actual - prev);
+	auto pct = prev == 0 ? 0 : static_cast<float>(delta) / prev;
+
+	cout << showpos << (delta) << "; " << FIXED_FLOAT(pct * 100) << "%" << noshowpos;
+}
+
+template <class T>
+void print_delta(const char* label, T actual, T prev) {
+	cout << label << ": " << actual << " (";
+	do_print_delta(actual, prev);
+	cout << ")" << endl;
+}
+
+// minify-remove:end
+
+class NullStream : public ostream {
+    class NullBuffer : public streambuf {
+    public:
+        int overflow( int c ) { return c; }
+    } m_nb;
+public:
+    NullStream() : ostream( &m_nb ) {}
+};
+
+#include "zpaq_impl.cpp"
+
+td::BufferSlice compress(td::Slice data) {
+	NullStream ofs;
+
+	Ref<Cell> block_root = std_boc_deserialize(data).move_as_ok();
+	
+	FullBlock block;
+	ParseContext load_std_ctx{ofs};
+	block.cell_unpack_std(load_std_ctx, block_root, 0, true);
+
+	ParseContext pack_opt_ctx{ofs};
+	auto opt_block_cell = block.make_opt_cell(pack_opt_ctx);
+
+	BagOfCells opt_boc;
+	opt_boc.add_root(opt_block_cell);
+	CHECK(opt_boc.import_cells().is_ok());
+
+	auto opt_ser = std_boc_serialize(opt_block_cell).move_as_ok();
+
+	// auto compressed = td::lz4_compress(opt_ser);
+	auto compressed = zpaq::compress(opt_ser);
+
+	return compressed;
+}
+
+td::BufferSlice decompress(td::Slice data) {
+	NullStream ofs;
+
+	// auto decompressed = td::lz4_decompress(data, 10'000'000).move_as_ok();
+	auto decompressed = zpaq::decompress(data);
+	auto opt_deser = std_boc_deserialize(decompressed).move_as_ok();
+
+	FullBlock opt_block;
+	ParseContext parse_opt_ctx{ofs};
+	opt_block.cell_unpack_opt(parse_opt_ctx, opt_deser, 0, true);
+
+	ParseContext pack_std_ctx{ofs};
+	auto un_opt_block_cell = opt_block.make_std_cell(pack_std_ctx);
+
+	BagOfCells un_opt_boc;
+	un_opt_boc.add_root(un_opt_block_cell);
+	CHECK(un_opt_boc.import_cells().is_ok());
+
+	auto boc = std_boc_serialize(un_opt_block_cell, 31).move_as_ok();
+	return boc;
+}
+
+// minify-remove:start
+
+void check_decompress() {
+	ifstream fin("out.txt");
+
+	string base64_data;
+	fin >> base64_data;
+
+	string mode = "decompress";
+
+	td::BufferSlice data(td::base64_decode(base64_data));
+
+	if (mode == "compress") {
+		data = compress(data);
+	} else {
+		data = decompress(data);
+	}
+
+	cout << td::str_base64_encode(data) << endl;
+}
+
+// minify-remove:end
+
 int main()
 {
-	std::ifstream fin("tests/1-001.txt");
+	// minify-remove:start
 
-	std::string block_base64;
+	// check_decompress();
+
+	ifstream fin("tests/1-001.txt");
+	ofstream fout_source("analysis-01-source-cells.txt");
+	ofstream fout_final("analysis-02-final-cells.txt");
+	ofstream fout_parse_std("analysis-03-parse-std.txt");
+	ofstream fout_pack_opt("analysis-04-pack-opt.txt");
+	ofstream fout_parse_opt("analysis-05-parse-opt.txt");
+	ofstream fout_pack_std("analysis-06-pack-std.txt");
+	ofstream fout_compressed_b64("analysis-07-compressed-b64.txt");
+
+	string block_base64;
 	fin >> block_base64;
 
 	if (block_base64 == "compress")
@@ -3411,15 +1663,107 @@ int main()
 		fin >> block_base64;
 	}
 
-	td::Ref<vm::Cell> block_root = vm::std_boc_deserialize(td::base64_decode(block_base64)).move_as_ok();
-	// FullBlock block;
-	// block.cell_unpack(block_root);
+	cout << "Deserializing block from b64..." << endl; 
+	auto original_test_block = td::base64_decode(block_base64);
 
-	auto bs = vm::std_boc_serialize(block_root).move_as_ok();
-	std::cout << bs.size() << std::endl;
+	Ref<Cell> block_root = vm::std_boc_deserialize(original_test_block).move_as_ok();
+	auto original_input_size = original_test_block.size();
+	cout << "Size: " << original_input_size << endl;
 
-	auto compressed = td::lz4_compress(bs);
-	std::cout << compressed.size() << std::endl;
+	auto original_block_bin = vm::std_boc_serialize(block_root).move_as_ok();
+	auto original_block_base64 = td::str_base64_encode(original_block_bin);
+	auto original_size = original_block_bin.size();
+
+	BagOfCells std_boc;
+	std_boc.add_root(block_root);
+	CHECK(std_boc.import_cells().is_ok());
+	cout << "Cells count: " << std_boc.cell_count << endl;
+
+	for (const auto& cell: std_boc.cell_list_) {
+		auto hex = cell.dc_ref->to_hex();
+		transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+
+		fout_source << hex.substr(0, 2) << " " << hex.substr(2, 2) << " " << hex.substr(4) << endl;
+	}
+
+	cout << "\n\nEnabled optimizations: " << enabled_optimizations.size() << endl; 
+	for (const auto& x: enabled_optimizations) {
+		cout << "+ " << x << endl; 
+	}
+
+	cout << "\nLoading standard block..." << endl; 
+	FullBlock block;
+	ParseContext load_std_ctx{fout_parse_std};
+	block.cell_unpack_std(load_std_ctx, block_root, 0, true);
+
+	cout << "\nOptimizing block..." << endl; 
+	ParseContext pack_opt_ctx{fout_pack_opt};
+	auto opt_block_cell = block.make_opt_cell(pack_opt_ctx);
+
+	BagOfCells opt_boc;
+	opt_boc.add_root(opt_block_cell);
+	CHECK(opt_boc.import_cells().is_ok());
+	print_delta("Optimized block cells count", opt_boc.cell_count, std_boc.cell_count);
+
+	auto opt_ser = vm::std_boc_serialize(opt_block_cell).move_as_ok();
+	print_delta("Optimized block size", opt_ser.size(), original_size);
+
+	auto compressed = td::lz4_compress(opt_ser);
+	print_delta("Compressed size", compressed.size(), opt_ser.size());
+
+	cout << "Total compression delta: ";
+	do_print_delta(compressed.size(), original_input_size);
+	cout << endl;
+
+	cout << "Score: " << (1000 * static_cast<float>(original_input_size * 2) / (original_input_size + compressed.size())) << endl;
+
+	auto compressed_b64 = td::str_base64_encode(compressed);
+	fout_compressed_b64 << compressed_b64;
+
+	auto compressed_b64_decoded = td::base64_decode(compressed_b64);
+	auto decompressed = td::lz4_decompress(compressed_b64_decoded, 10'000'000).move_as_ok();
+	auto opt_deser = vm::std_boc_deserialize(decompressed).move_as_ok();
+
+	cout << "\nLoading optimized block..." << endl; 
+	FullBlock opt_block;
+	ParseContext parse_opt_ctx{fout_parse_opt};
+	opt_block.cell_unpack_opt(parse_opt_ctx, opt_deser, 0, true);
+
+	cout << "\nUn-optimizing block..." << endl; 
+	ParseContext pack_std_ctx{fout_pack_std};
+	auto un_opt_block_cell = opt_block.make_std_cell(pack_std_ctx);
+
+	BagOfCells un_opt_boc;
+	un_opt_boc.add_root(un_opt_block_cell);
+	CHECK(un_opt_boc.import_cells().is_ok());
+	print_delta("Un-optimized block cells count", un_opt_boc.cell_count, std_boc.cell_count);
+
+	for (const auto& cell: un_opt_boc.cell_list_) {
+		auto hex = cell.dc_ref->to_hex();
+		transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+
+		fout_final << hex.substr(0, 2) << " " << hex.substr(2, 2) << " " << hex.substr(4) << endl;
+	}
+
+	auto un_opt_bin = vm::std_boc_serialize(un_opt_block_cell, 31).move_as_ok();
+	print_delta("Un-optimized block size", un_opt_bin.size(), original_input_size);
+
+	auto un_opt_base64 = td::str_base64_encode(un_opt_bin);
+
+	cout << "Matching: " << (un_opt_base64 == block_base64) << endl;
+
+	if (un_opt_base64 != block_base64) {
+		for (int i = 0; i < block_base64.size(); ++i) {
+			if (block_base64[i] != un_opt_base64.at(i)) {
+				cout << "First mismatch starting at " << i << endl;
+				break;
+			}
+		}
+	}
+
+	CHECK(un_opt_base64 == block_base64);
+
+	return 0; // there's code below, if you remove that code will be executed
 
 	// ogiinal          229,919
 	// lz4              200,368
@@ -3431,4 +1775,97 @@ int main()
 	// 1068.6774176305582
 	// >>> (2 * 229919) / (229919 + 199103) * 1000
 	// 1071.8284843201513
+
+	// Enabled optimizations: 6
+	// + Block
+	// + BlockExtra
+	// + HashmapAug
+	// + HashmapAugE
+	// + HashmapAugNode
+	// + InMsgDescr
+
+	// Loading standard block...
+
+	// Optimizing block...
+	// Optimized block cells count: 7198 (+0; +0.00%)
+	// Optimized block size: 228506 (-1413; -0.61%)
+	// Compressed size: 198898 (-29608; -12.96%)
+	// Score: 1146.21
+
+/*
+Enabled optimizations: 0
+
+Loading standard block...
+
+Optimizing block...
+Optimized block cells count: 7198 (+0; +0.00%)
+Optimized block size: 229919 (+0; +0.00%)
+Compressed size: 200368 (-29551; -12.85%)
+Total compression delta: -66653; -24.96%
+Score: 1142.61
+*/
+
+/*
+
+Enabled optimizations: 6
++ Block
++ BlockExtra
++ HashmapAug
++ HashmapAugE
++ HashmapAugNode
++ InMsgDescr
+
+Loading standard block...
+
+Optimizing block...
+Optimized block cells count: 7198 (+0; +0.00%)
+Optimized block size: 228506 (-1413; -0.61%)
+Compressed size: 198898 (-29608; -12.96%)
+Total compression delta: -68123; -25.51%
+Score: 1146.21
+
+*/
+
+/*
+Enabled optimizations: 7
++ Block
++ BlockExtra
++ HashmapAug
++ HashmapAugE
++ HashmapAugNode
++ InMsgDescr
++ OutMsgDescr
+
+Loading standard block...
+
+Optimizing block...
+Optimized block cells count: 7198 (+0; +0.00%)
+Optimized block size: 227693 (-2226; -0.97%)
+Compressed size: 198074 (-29619; -13.01%)
+Total compression delta: -68947; -25.82%
+Score: 1148.24
+*/
+
+	// minify-remove:end
+
+	// minify-remove
+	{
+		string mode;
+		cin >> mode;
+		// minify-remove
+		CHECK(mode == "compress" || mode == "decompress");
+
+		string base64_data;
+		cin >> base64_data;
+
+		// minify-remove
+		CHECK(!base64_data.empty());
+
+		td::BufferSlice data(td::base64_decode(base64_data));
+
+		data = (mode == "compress") ? compress(data) : decompress(data);
+
+		cout << td::str_base64_encode(data) << endl;
+	// minify-remove
+	}
 }

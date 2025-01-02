@@ -2,30 +2,61 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build-experimental", // Task name
+      "label": "build-experimental", 
       "type": "shell",
-      "command": "g++", // Compiler
+      "command": "g++",
       "args": [
-        "-g", // Debug symbols
+        "-g",
 				"-std=c++17",
 				"-Iinclude",
 				"-Iinclude/crypto",
 				"-Iinclude/tdutils", 
 				"-Iinclude/ton", 
 				"-Iinclude/common",
-        "${workspaceFolder}/experimental.cpp", // Source file
+        "${workspaceFolder}/experimental.cpp",
 				"-L.",
 				"-lton_crypto_lib",
-				// "-lton_crypto",
         "-o",
-        "${workspaceFolder}/experimental.out" // Output executable
+        "${workspaceFolder}/experimental.out"
       ],
       "group": {
         "kind": "build",
-        "isDefault": true // Makes it the default build task
+        "isDefault": true
       },
-      "problemMatcher": ["$gcc"], // Error matching for diagnostics
-      "detail": "Compile C++ code"
+      "problemMatcher": ["$gcc"],
+      "detail": "Build experimental.cpp",
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      }
+    },
+    {
+      "label": "build-solution", 
+      "type": "shell",
+      "command": "g++",
+      "args": [
+        "-g",
+				"-std=c++17",
+				"-Iinclude",
+				"-Iinclude/crypto",
+				"-Iinclude/tdutils", 
+				"-Iinclude/ton", 
+				"-Iinclude/common",
+        "${workspaceFolder}/solution.cpp",
+				"-L.",
+				"-lton_crypto_lib",
+        "-o",
+        "${workspaceFolder}/solution.out"
+      ],
+      "group": {
+        "kind": "build",
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build solition.cpp",
+      "presentation": {
+        "reveal": "silent",
+        "clear": true
+      }
     }
   ]
 }

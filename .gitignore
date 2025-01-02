@@ -3,3 +3,7 @@
 .DS_Store
 /lib
 *.dylib
+/.tmp
+/untitled folder
+/*.out.*/
+/executable

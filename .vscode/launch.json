@@ -18,6 +18,21 @@
       "externalConsole": false,
       "MIMode": "lldb", // Use LLDB for macOS
       "preLaunchTask": "build-experimental"
+    },
+    {
+      "name": "Debug Solution",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/solution.out", // Path to the executable
+      "args": [], // Arguments for the program
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {"name": "DYLD_LIBRARY_PATH", "value": "."}
+      ],
+      "externalConsole": false,
+      "MIMode": "lldb", // Use LLDB for macOS
+      "preLaunchTask": "build-solution"
     }
   ]
 }
