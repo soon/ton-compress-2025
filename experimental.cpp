@@ -1,8 +1,8 @@
 // minify-remove:start
 #define private public
-#define final
 #define FIXED_FLOAT(x) fixed <<setprecision(2)<<(x)
 // minify-remove:end
+#define final
 
 #include <iostream>
 #include <sstream>
@@ -29,11 +29,31 @@
 using namespace vm;
 using namespace std;
 
+set<string> enabled_optimizations{
+	"Block",
+	"BlockExtra",
+	
+	"HashmapAugE",
+	"HashmapAug",
+	"HashmapAugNode",
+
+	"InMsgDescr",
+	"OutMsgDescr",
+
+	"MERKLE_UPDATE",
+	"ShardState",
+	"ShardStateUnsplit",
+	"OutMsgQueueInfo",
+	"OutMsgQueue",
+	// "ShardStateUnsplit_aux",
+};
+
 CellSlice to_cs(Ref<Cell> cell)
 {
 	// minify-remove
 	CHECK(!cell.is_null())
-	return load_cell_slice(move(cell));
+	bool can_be_special = false;
+	return load_cell_slice_special(std::move(cell), can_be_special);
 }
 
 struct ParseContext {
@@ -59,19 +79,6 @@ string bin_to_hex(const string& bin) {
 }
 // minify-remove:end
 
-set<string> enabled_optimizations{
-	"Block",
-	"BlockExtra",
-	
-	"HashmapAugE",
-	"HashmapAug",
-	"HashmapAugNode",
-
-	"InMsgDescr",
-	"OutMsgDescr",
-
-	// "ImportFees",
-};
 
 template <class T_TLB>
 struct BaseFullCell
@@ -83,6 +90,11 @@ struct BaseFullCell
 
 	string name;
 	T_TLB type;
+	int special_type = 0;
+
+	BaseFullCell(string name): BaseFullCell(name, T_TLB()) {
+
+	}
 
 	BaseFullCell(string name, T_TLB type): name(name), type(type) {
 
@@ -112,19 +124,59 @@ struct BaseFullCell
 		return enabled_optimizations.count(name) > 0;
 	}
 
+	bool is_pruned_branch() {
+		return special_type == 1;
+	}
+
 	void unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0, bool check_empty = false) {
 		auto e = is_enabled();
-		// minify-remove
-		ctx.indent(indent) << (name + ".unpack_std ") << (e ? "" : "(disabled) ") << cs.as_bitslice().to_hex() << endl;
+		special_type = (int)cs.special_type();
+		// minify-remove:start
+		ctx.indent(indent) << (name + ".unpack_std ") 
+											 << (e ? "" : "(disabled) ") 
+											 << special_type << ":" 
+											 << cs.size() << ":" 
+											 << cs.size_refs() 
+											 << "[" << cs.as_bitslice().to_hex() << "]"
+											 << endl;
+		ctx.indent(indent) << (name + ".unpack_std ") 
+											 << (e ? "" : "(disabled) ") 
+											 << special_type << ":" 
+											 << cs.size() << ":" 
+											 << cs.size_refs() 
+											 << "[" << cs.as_bitslice().to_binary() << "]" 
+											 << endl;
+		// minify-remove:end
 
 		incoming_cs = cs;
+
+		if (is_pruned_branch()) {
+			cs.advance(288);
+			// minify-remove:start
+			ctx.indent(indent) << (name + ".unpack_std ") << "^ Pruned branch" << endl;
+			CHECK(cs.empty_ext());
+			CHECK(incoming_cs.size() == 288);
+			// minify-remove:end
+			return;
+		}
 
 		if (e) {
 			do_unpack_std(ctx, cs, indent);
 		} else {
 			std_cell_cs = type.fetch(cs).write();
-			// minify-remove
-			ctx.indent(indent) << (name + ".unpack_std: fetched ") <<  std_cell_cs.as_bitslice().to_hex() << endl;
+			// minify-remove:start
+			ctx.indent(indent) << (name + ".unpack_std: fetched ") 
+												 << special_type << ":" 
+												 << std_cell_cs.size() << ":" 
+												 << std_cell_cs.size_refs() 
+												 << "[" << std_cell_cs.as_bitslice().to_hex() << "]" 
+												 << endl;
+			ctx.indent(indent) << (name + ".unpack_std: fetched ") 
+												 << special_type << ":" 
+												 << std_cell_cs.size() << ":" 
+												 << std_cell_cs.size_refs() 
+												 << "[" << std_cell_cs.as_bitslice().to_binary() << "]" << endl;
+			// minify-remove:end
 		}
 		// minify-remove:start
 		if (check_empty) {
@@ -136,21 +188,40 @@ struct BaseFullCell
 	void pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
 		auto e = is_enabled();
 
-		// minify-remove
-		auto current_bs = cb.as_cellslice().as_bitslice().to_binary();
+		// minify-remove:start
+		auto current_bin = cb.as_cellslice().as_bitslice().to_binary();
+		auto current_refs = cb.size_refs();
+		// minify-remove:end
 
-		if (e) {
+		if (is_pruned_branch()) {
+			cb.append_cellslice(incoming_cs);
+		} else if (e) {
 			do_pack_opt(ctx, cb, indent);
 		} else {
 			cb.append_cellslice(std_cell_cs);
 		}
 
 		// minify-remove:start
-		auto new_bs = cb.as_cellslice().as_bitslice().to_binary();
-		auto added_bs = new_bs.substr(current_bs.length());
+		auto new_cs = cb.as_cellslice();
+		auto new_bs = new_cs.as_bitslice();
+		auto new_bin = new_bs.to_binary();
+		auto added_bin = new_bin.substr(current_bin.length());
+		auto added_refs = cb.size_refs() - current_refs;
 
-		ctx.indent(indent) << (name + ".pack_opt ") << (e ? "" : "(disabled) ") << bin_to_hex(added_bs) << endl;
-		ctx.indent(indent) << (name + ".pack_opt full ") << (e ? "" : "(disabled) ") << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		ctx.indent(indent) << (name + ".pack_opt ") 
+											 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}" 
+											 << "-:" 
+											 << added_bin.length() << ":" 
+											 << added_refs 
+											 << "[" << bin_to_hex(added_bin) << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_opt full ") 
+											 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}" 
+											 << (int)new_cs.special_type() << ":" 
+											 << cb.size() << ":" 
+											 << cb.size_refs() 
+											 << "[" << new_cs.as_bitslice().to_hex() << "]" << endl;
 		// minify-remove:end
 	}
 
@@ -182,10 +253,20 @@ struct BaseFullCell
 	void pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
 		auto e = is_enabled();
 
-		// minify-remove
-		ctx.indent(indent) << (name + ".pack_std begin ") << (e ? "" : "(disabled) ")  << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		// minify-remove:start
+		auto current_cs = cb.as_cellslice();
+		ctx.indent(indent) << (name + ".pack_std begin ") 
+		    							 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}"
+											 << (int)current_cs.special_type() << ":"
+											 << cb.size() << ":"
+											 << cb.size_refs() 
+											 << "[" << current_cs.as_bitslice().to_hex() << "]" << endl;
+		// minify-remove:end
 
-		if (e) {
+		if (is_pruned_branch()) {
+			cb.append_cellslice(incoming_cs);
+		} else if (e) {
 			do_pack_std(ctx, cb, indent);
 		} else {
 			if (!std_cell_cs.is_valid()) {
@@ -194,10 +275,23 @@ struct BaseFullCell
 			cb.append_cellslice(std_cell_cs);
 		}
 
-		// minify-remove
-		ctx.indent(indent) << (name + ".pack_std ") << (e ? "" : "(disabled) ") << cb.as_cellslice().as_bitslice().to_hex() << endl;
-		// minify-remove
-		ctx.indent(indent) << (name + ".pack_std ") << (e ? "" : "(disabled) ") << cb.as_cellslice().as_bitslice().to_binary() << endl;
+		// minify-remove:start
+		auto new_cs = cb.as_cellslice();
+		ctx.indent(indent) << (name + ".pack_std ") 
+											 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}"
+											 << (int)new_cs.special_type() << ":"
+											 << cb.size() << ":"
+											 << cb.size_refs() 
+											 << "[" << new_cs.as_bitslice().to_hex() << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_std ") 
+		 									 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}"
+											 << (int)new_cs.special_type() << ":"
+											 << cb.size() << ":"
+											 << cb.size_refs() 
+											 << "[" << new_cs.as_bitslice().to_binary() << "]" << endl;
+		// minify-remove:end
 	}
 
 	Ref<Cell> make_std_cell(ParseContext& ctx, int indent = 0) {
@@ -206,11 +300,16 @@ struct BaseFullCell
 		CellBuilder cb;
 		pack_std(ctx, cb, indent);
 		// minify-remove:start
+		auto cs = cb.as_cellslice();
 		ctx.indent(indent) << "------------------- " << name << " std cell final -------------------" << endl;
-		ctx.indent(indent) << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		ctx.indent(indent) << "{" << special_type << "}"
+											 << (int)cs.special_type() << ":"
+											 << cb.size() << ":"
+											 << cb.size_refs() 
+											 << "[" << cs.as_bitslice().to_binary() << "]" << endl;
 		ctx.indent(indent) << "------------------- " << name << " std cell end -------------------" << endl;
 		// minify-remove:end
-		return cb.finalize();
+		return cb.finalize(special_type!=0);
 	}
 
 	Ref<Cell> make_opt_cell(ParseContext& ctx, int indent = 0) {
@@ -219,22 +318,28 @@ struct BaseFullCell
 		CellBuilder cb;
 		pack_opt(ctx, cb, indent);
 		// minify-remove:start
+		auto cs = cb.as_cellslice();
 		ctx.indent(indent) << "------------------- " << name << " opt cell final -------------------" << endl;
-		ctx.indent(indent) << cb.as_cellslice().as_bitslice().to_hex() << endl;
+		ctx.indent(indent) << "{" << special_type << "}"
+											 << (int)cs.special_type() << ":"
+											 << cb.size() << ":"
+											 << cb.size_refs() 
+											 << "[" << cs.as_bitslice().to_binary() << "]" << endl;
 		ctx.indent(indent) << "------------------- " << name << " opt cell end -------------------" << endl;
 		// minify-remove:end
-		return cb.finalize();
+		return cb.finalize(special_type!=0);
 	}
 
 	void cell_unpack_std(ParseContext& ctx, Ref<Cell> cell_ref, int indent = 0, bool check_empty = false)
 	{
-		auto cs = to_cs(move(cell_ref));
+		auto cs = to_cs(std::move(cell_ref));
+
 		unpack_std(ctx, cs, indent, check_empty);
 	}
 
 	void cell_unpack_opt(ParseContext& ctx, Ref<Cell> cell_ref, int indent = 0, bool check_empty = false)
 	{
-		auto cs = to_cs(move(cell_ref));
+		auto cs = to_cs(std::move(cell_ref));
 		unpack_opt(ctx, cs, indent, check_empty);
 	}
 };
@@ -253,7 +358,9 @@ struct AddValues {
 
 	T_TLB add_type;
 
-	AddValues(const T_TLB& add_type): add_type(add_type) {}
+	AddValues(T_TLB add_type): add_type(add_type) {}
+
+	AddValues(): AddValues(T_TLB{}) {}
 
 	virtual ~AddValues() {}
 
@@ -266,7 +373,334 @@ struct AddValues {
 
 using namespace block::tlb;
 
+const CurrencyCollection tCC;
+const OutMsg tOM;
+const ImportFees tIF;
+const InMsg tIM;
+const EnqueuedMsg tEM;
+const UInt tU64{64};
+
+/// HashmapAug 
+
+
+template <class TValue, class TExtra>
+struct FullHashmapAug;
+
+
+template <class TValue, class TExtra>
+struct FullHashmapAugNode : BaseFullCell<block::gen::HashmapAugNode>
+{
+	/*
+
+	ahmn_leaf#_
+		{X:Type}
+		{Y:Type}
+
+		extra:Y
+		value:X
+	= HashmapAugNode 0 X Y;
+
+	ahmn_fork#_
+		{n:#}
+		{X:Type}
+		{Y:Type}
+
+		left:^(HashmapAug n X Y)
+		right:^(HashmapAug n X Y)
+		extra:Y
+	= HashmapAugNode (n + 1) X Y;
+
+	*/
+
+	int tag = -1;
+	int n = -1;
+	Ref<FullHashmapAug<TValue, TExtra>> left;
+	Ref<FullHashmapAug<TValue, TExtra>> right;
+
+	TValue value;
+	TExtra extra;
+
+	FullHashmapAugNode(int m,  const TLB &X, const TLB &Y) : BaseFullCell("HashmapAugNode", block::gen::HashmapAugNode(m, X, Y)) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == block::gen::HashmapAugNode::ahmn_leaf || tag == block::gen::HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			extra.unpack_std(ctx, cs, indent + 1);
+			value.unpack_std(ctx, cs, indent + 1);
+			// minify-remove
+			CHECK(cs.empty_ext());
+		}
+		else
+		{
+			int n;
+			add_r1(n, 1, type.m_);
+
+			left = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			left.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+			right = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			right.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+			extra.unpack_std(ctx, cs, indent + 1);
+
+			// minify-remove
+			CHECK(cs.empty_ext());
+		}
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			value.pack_opt(ctx, cb, indent + 1);
+		}
+		else {
+			int n;
+			CHECK(add_r1(n, 1, type.m_));
+			cb.store_ref(left.write().make_opt_cell(ctx, indent + 1));
+			cb.store_ref(right.write().make_opt_cell(ctx, indent + 1));
+		}
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			value.unpack_opt(ctx, cs, indent + 1);
+			auto extra_cs = value.calc_aug_data();
+			extra.unpack_opt(ctx, extra_cs, indent + 1, true);
+			// minify-remove
+			CHECK(cs.empty_ext());
+		}
+		else
+		{
+			int n;
+			add_r1(n, 1, type.m_);
+
+			left = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			left.write().cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+
+			right = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
+			right.write().cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+
+			auto left_extra_cs = to_cs(left.write().node.extra.make_std_cell(ctx));
+			auto right_extra_cs = to_cs(right.write().node.extra.make_std_cell(ctx));
+
+			auto extra_cs = extra.add_values(left_extra_cs, right_extra_cs);
+			extra.unpack_opt(ctx, extra_cs, indent + 1, true);
+		}
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
+
+		if (tag == 0) // HashmapAugNode::ahmn_leaf
+		{
+			// minify-remove
+			CHECK(type.m_ == 0);
+			extra.pack_std(ctx, cb, indent + 1);
+			value.pack_std(ctx, cb, indent + 1);
+		}
+		else {
+			int n;
+			CHECK(add_r1(n, 1, type.m_));
+			cb.store_ref(left.write().make_std_cell(ctx, indent + 1));
+			cb.store_ref(right.write().make_std_cell(ctx, indent + 1));
+			extra.pack_std(ctx, cb, indent + 1);
+		}
+	}
+};
+
+template <class TValue, class TExtra>
+struct FullHashmapAug : BaseFullCell<block::gen::HashmapAug>, td::CntObject
+{
+	/*
+
+	ahm_edge#_
+		{n:#}
+		{X:Type}
+		{Y:Type}
+		{l:#}
+		{m:#}
+		label:(HmLabel ~l n) {n = (~m) + l}
+		node:(HashmapAugNode m X Y)
+	= HashmapAug n X Y;
+
+	*/
+	Ref<CellSlice> label;
+	int n, m, l;
+
+	FullHashmapAugNode<TValue, TExtra> node;
+
+	FullHashmapAug(int n, const TLB &X, const TLB &Y) : BaseFullCell("HashmapAug", block::gen::HashmapAug(n, X, Y)), node(n, X, Y) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		n = type.m_;
+		// minify-remove
+		CHECK(n >= 0);
+		CHECK(block::gen::HmLabel{n}.fetch_to(cs, label, l));
+		m = n - l;
+		node.type.m_ = m;
+		node.unpack_std(ctx, cs, indent + 1);
+		// minify-remove
+		CHECK(cs.empty_ext());
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		int l, m;
+		CHECK(tlb::store_from(cb, HmLabel{type.m_}, label, l));
+		CHECK(add_r1(m, l, type.m_));
+		node.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		CHECK(
+			(n = type.m_) >= 0
+      && block::gen::HmLabel{type.m_}.fetch_to(cs, label, l)
+      && add_r1(m, l, type.m_)
+		);
+		node.type.m_ = m;
+		node.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		int l, m;
+		CHECK(
+				tlb::store_from(cb, block::gen::HmLabel{type.m_}, label, l)
+      && add_r1(m, l, type.m_)
+		);
+		node.pack_std(ctx, cb, indent + 1);
+	}
+};
+
+template <class TValue, class TExtra>
+struct FullHashmapAugE : BaseFullCell<block::gen::HashmapAugE>
+{
+	/*
+	ahme_empty$0
+		{n:#}
+		{X:Type}
+		{Y:Type}
+
+		extra:Y
+	= HashmapAugE n X Y;
+
+	ahme_root$1
+		{n:#}
+		{X:Type}
+		{Y:Type}
+
+		root:^(HashmapAug n X Y)
+		extra:Y
+	= HashmapAugE n X Y;
+	*/
+
+	block::gen::HashmapAugE::Record_ahme_root r;
+
+	int tag = -1;
+	FullHashmapAug<TValue, TExtra> root;
+	TExtra extra;
+
+	FullHashmapAugE(int n, const TLB &X, const TLB &Y) : BaseFullCell("HashmapAugE", block::gen::HashmapAugE(n, X, Y)), root(n, X, Y) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == block::gen::HashmapAugE::ahme_empty || tag == block::gen::HashmapAugE::ahme_root)
+
+		if (tag == block::gen::HashmapAugE::ahme_empty)
+		{
+			CHECK(cs.fetch_ulong(1) == 0);
+			extra.unpack_std(ctx, cs, indent + 1);
+			// minify-remove
+			CHECK(cs.empty_ext());
+		}
+		else 
+		{
+			CHECK(type.unpack(cs, r));
+
+			root.cell_unpack_std(ctx, r.root, indent + 1);
+			extra.unpack_std(ctx, r.extra.write(), indent + 1);
+		}
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
+	{
+		// minify-remove
+		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
+
+		if (tag == HashmapAugE::ahme_empty) {
+			cb.store_long(0, 1);
+			extra.pack_opt(ctx, cb, indent + 1);
+		} else {
+			cb.store_long(1, 1).store_ref(root.make_opt_cell(ctx, indent + 1));
+			extra.pack_opt(ctx, cb, indent + 1);
+		}
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		tag = type.check_tag(cs);
+		// minify-remove
+		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
+
+		if (tag == HashmapAugE::ahme_empty)
+		{
+			CHECK(cs.fetch_ulong(1) == 0);
+			extra.unpack_opt(ctx, cs, indent + 1);
+		}
+		else
+		{
+			CHECK(cs.fetch_ulong(1) == 1 && (r.n = type.m_) >= 0);
+			auto root_ref = cs.fetch_ref();
+			root.cell_unpack_opt(ctx, root_ref, indent + 1);
+			extra = root.node.extra;
+		}
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
+
+		if (tag == HashmapAugE::ahme_empty) {
+			cb.store_long(0, 1);
+			extra.pack_std(ctx, cb, indent + 1);
+		} else {
+			cb.store_long(1, 1)
+			.store_ref(root.make_std_cell(ctx, indent + 1));
+			extra.pack_std(ctx, cb, indent + 1);
+		} 
+	}
+};
+
+
 /// gen start
+
+struct FullUInt : BaseFullCell<UInt>, AddValues<UInt> {
+	FullUInt(string name, UInt type) : BaseFullCell(name, type), AddValues(type) {}
+};
+
+struct FullUInt64 : FullUInt {
+    FullUInt64() : FullUInt("Unit64", tU64) {}
+};
+
 
 // struct FullUnit : BaseFullCell<block::gen::Unit> {
 //     FullUnit() : BaseFullCell("Unit", block::gen::t_Unit) {}
@@ -439,32 +873,55 @@ using namespace block::tlb;
 struct FullImportFees;
 
 struct FullInMsg : BaseFullCell<InMsg>, AugDataProvider<FullImportFees> {
-    FullInMsg() : BaseFullCell("InMsg", t_InMsg) {}
+    FullInMsg() : BaseFullCell("InMsg", InMsg()) {}
 
 	CellSlice calc_aug_data() override {
 		CellBuilder cb;
 		auto cs_copy = std_cell_cs;
-		CHECK(t_InMsg.get_import_fees(cb, cs_copy));
+		CHECK(type.get_import_fees(cb, cs_copy));
 		return cb.as_cellslice();
 	}
 };
 
-struct FullCurrencyCollection;
+struct FullCurrencyCollection : BaseFullCell<CurrencyCollection>, AddValues<CurrencyCollection>
+{
+	FullCurrencyCollection() : BaseFullCell("CurrencyCollection") {}
+};
 
 struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection> {
-    FullOutMsg() : BaseFullCell("OutMsg", t_OutMsg) {}
+    FullOutMsg() : BaseFullCell("OutMsg", OutMsg()) {}
 
 	CellSlice calc_aug_data() override {
 		CellBuilder cb;
 		auto cs_copy = std_cell_cs;
-		CHECK(t_OutMsg.get_export_value(cb, cs_copy));
+		CHECK(type.get_export_value(cb, cs_copy));
 		return cb.as_cellslice();
 	}
 };
 
-// struct FullEnqueuedMsg : BaseFullCell<block::gen::EnqueuedMsg> {
-//     FullEnqueuedMsg() : BaseFullCell("EnqueuedMsg", block::gen::t_EnqueuedMsg) {}
-// };
+struct EnqueuedMsgAug : FullUInt64 {
+	CellSlice add_values(CellSlice& cs1, CellSlice& cs2) override {
+		CellBuilder cb;
+		unsigned long long x, y;
+		CHECK(
+			cs1.fetch_ulong_bool(64, x) && 
+			cs2.fetch_ulong_bool(64, y) &&
+      cb.store_ulong_rchk_bool(std::min(x, y), 64)
+		);
+		return cb.as_cellslice();
+	}
+};
+
+struct FullEnqueuedMsg : BaseFullCell<EnqueuedMsg>, AugDataProvider<EnqueuedMsgAug> {
+    FullEnqueuedMsg() : BaseFullCell("EnqueuedMsg") {}
+
+	CellSlice calc_aug_data() override {
+		CellBuilder cb;
+		auto cs_copy = std_cell_cs;
+		CHECK(Aug_OutMsgQueue().eval_leaf(cb, cs_copy));
+		return cb.as_cellslice();
+	}
+};
 
 // struct FullProcessedUpto : BaseFullCell<block::gen::ProcessedUpto> {
 //     FullProcessedUpto() : BaseFullCell("ProcessedUpto", block::gen::t_ProcessedUpto) {}
@@ -494,9 +951,62 @@ struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection
 //     FullOutMsgQueueExtra() : BaseFullCell("OutMsgQueueExtra", block::gen::t_OutMsgQueueExtra) {}
 // };
 
-// struct FullOutMsgQueueInfo : BaseFullCell<block::gen::OutMsgQueueInfo> {
-//     FullOutMsgQueueInfo() : BaseFullCell("OutMsgQueueInfo", block::gen::t_OutMsgQueueInfo) {}
-// };
+struct FullOutMsgQueue : BaseFullCell<OutMsgQueue> {
+	/* 
+	_ (HashmapAugE 352 EnqueuedMsg uint64) = OutMsgQueue;
+
+	*/
+
+	FullHashmapAugE<FullEnqueuedMsg, EnqueuedMsgAug> x{352, tEM, tU64};
+
+	FullOutMsgQueue(): BaseFullCell("OutMsgQueue", OutMsgQueue()) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		x.unpack_std(ctx, cs, indent + 1);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		x.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_std(ctx, cb, indent + 1);
+	}
+};
+
+
+struct FullOutMsgQueueInfo : BaseFullCell<OutMsgQueueInfo> {
+	/*
+	
+	_ 
+		out_queue:OutMsgQueue 
+		proc_info:ProcessedInfo
+  	extra:(Maybe OutMsgQueueExtra) 
+	= OutMsgQueueInfo;
+	*/
+
+	CellSlice ics;
+	FullOutMsgQueue out_queue;
+
+	FullOutMsgQueueInfo() : BaseFullCell("OutMsgQueueInfo") {}
+
+
+	virtual void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) {
+		out_queue.unpack_std(ctx, cs, indent + 1);
+		ics = cs;
+		cs.advance(cs.size());
+		cs.advance_refs(cs.size_refs());
+	}
+
+	virtual void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+		out_queue.pack_std(ctx, cb, indent + 1);
+		cb.append_cellslice(ics);
+	}
+};
 
 // struct FullStorageUsed : BaseFullCell<block::gen::StorageUsed> {
 //     FullStorageUsed() : BaseFullCell("StorageUsed", block::gen::t_StorageUsed) {}
@@ -546,9 +1056,58 @@ struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection
 //     FullTransaction() : BaseFullCell("Transaction", block::gen::t_Transaction) {}
 // };
 
-// struct FullMERKLE_UPDATE : BaseFullCell<block::gen::MERKLE_UPDATE> {
-//     FullMERKLE_UPDATE() : BaseFullCell("MERKLE_UPDATE", block::gen::t_MERKLE_UPDATE) {}
-// };
+struct MyMERKLE_UPDATE : block::gen::MERKLE_UPDATE {
+	MyMERKLE_UPDATE(const TLB& X) : MERKLE_UPDATE(X) {}
+
+	bool skip(vm::CellSlice& cs) const override {
+		return cs.advance_ext(0x208, 2);
+  }
+};
+
+template <class T>
+struct FullMERKLE_UPDATE : BaseFullCell<MyMERKLE_UPDATE> {
+	/* Optimized by only storing 2 refs instead of tag, hash & levels */
+	Ref<T> from_proof;
+	Ref<T> to_proof;
+
+	FullMERKLE_UPDATE(const T &type) : BaseFullCell("MERKLE_UPDATE", MyMERKLE_UPDATE(type.type)) {
+
+	}
+
+	void do_unpack_std(ParseContext &ctx, CellSlice &cs, int indent = 0) override {
+		CHECK(cs.advance(520)); // 8 + 256 * 2
+
+		from_proof = Ref<T>(true);
+		from_proof.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+		to_proof = Ref<T>(true);
+		to_proof.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		
+		// minify-remove
+		CHECK(cs.size_ext() == 0x20); // we don't need to fetch depth
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_ref(from_proof.write().make_std_cell(ctx, indent + 1));
+		cb.store_ref(to_proof.write().make_std_cell(ctx, indent + 1));
+		special_type = 0;
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		from_proof = Ref<T>(true);
+		from_proof.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+		to_proof = Ref<T>(true);
+		to_proof.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+	}
+
+	Ref<Cell> make_std_cell(ParseContext& ctx, int indent = 0) {
+	  return CellBuilder::create_merkle_update(
+				from_proof.write().make_std_cell(ctx, indent + 1),
+				to_proof.write().make_std_cell(ctx, indent + 1)
+		);
+	}
+};
 
 // struct FullHASH_UPDATE : BaseFullCell<block::gen::HASH_UPDATE> {
 //     FullHASH_UPDATE() : BaseFullCell("HASH_UPDATE", block::gen::t_HASH_UPDATE) {}
@@ -642,17 +1201,153 @@ struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection
 //     FullBlkMasterInfo() : BaseFullCell("BlkMasterInfo", block::gen::t_BlkMasterInfo) {}
 // };
 
-// struct FullShardStateUnsplit_aux : BaseFullCell<block::gen::ShardStateUnsplit_aux> {
-//     FullShardStateUnsplit_aux() : BaseFullCell("ShardStateUnsplit_aux", block::gen::t_ShardStateUnsplit_aux) {}
-// };
+struct FullShardStateUnsplit_aux : BaseFullCell<ShardState_aux> {
+    FullShardStateUnsplit_aux() : BaseFullCell("ShardStateUnsplit_aux") {}
 
-// struct FullShardStateUnsplit : BaseFullCell<block::gen::ShardStateUnsplit> {
-//     FullShardStateUnsplit() : BaseFullCell("ShardStateUnsplit", block::gen::t_ShardStateUnsplit) {}
-// };
+	CellSlice ics;
+	Ref<Cell> r1, r2;
 
-// struct FullShardState : BaseFullCell<block::gen::ShardState> {
-//     FullShardState() : BaseFullCell("ShardState", block::gen::t_ShardState) {}
-// };
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		r1 = cs.fetch_ref();
+		// r2 = cs.fetch_ref();
+		ics = cs;
+		// minify-remove
+		CHECK(cs.size_refs() == 0);
+	}
+
+	// // virtual void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+	// // 	do_pack_std(ctx, cb, indent);
+	// // }
+
+	// // virtual void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) {
+	// // 	do_unpack_std(ctx, cs, indent);
+	// // }
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// cb.append_cellslice(ics).store_ref(r1).store_ref(r2);
+		cb.append_cellslice(ics);
+		if (!r1.is_null()) {
+			cb.store_ref(r1);
+		}
+		// if (!r2.is_null()) {
+		// 	cb.store_ref(r2);
+		// }
+	}
+};
+
+struct MyMcStateExtra : block::gen::McStateExtra {
+  bool skip(vm::CellSlice& cs) const override {
+		return cs.advance(16)
+      && block::gen::ShardHashes().skip(cs)
+      && cs.advance_ext(0x100, 2)
+      && tCC.skip(cs);
+	}
+};
+
+struct FullMcStateExtra : BaseFullCell<MyMcStateExtra> {
+    FullMcStateExtra() : BaseFullCell("McStateExtra", MyMcStateExtra()) {}
+};
+
+const block::gen::ShardStateUnsplit_aux tSSUa;
+const block::gen::RefT tRMSE{MyMcStateExtra()};
+const block::gen::Maybe tMRMSE{tRMSE};
+
+struct MyShardStateUnsplit : block::gen::ShardStateUnsplit {
+	bool skip(vm::CellSlice& cs) const {
+		return cs.advance_ext(0x169, 3)
+				&& tMRMSE.skip(cs);
+	}
+};
+
+struct FullShardStateUnsplit : BaseFullCell<MyShardStateUnsplit> {
+	/*
+	todo can optimize tag
+	
+	shard_state#9023afe2 
+		global_id:int32
+  	shard_id:ShardIdent 
+  	seq_no:uint32 
+		vert_seq_no:#
+  	gen_utime:uint32 
+		gen_lt:uint64
+  	min_ref_mc_seqno:uint32
+  	out_msg_queue_info:^OutMsgQueueInfo
+  	before_split:(## 1)
+  	accounts:^ShardAccounts
+  	^[ 
+			overload_history:uint64 
+			underload_history:uint64
+  		total_balance:CurrencyCollection
+  		total_validator_fees:CurrencyCollection
+  		libraries:(HashmapE 256 LibDescr)
+  		master_ref:(Maybe BlkMasterInfo) 
+		]
+  	custom:(Maybe ^McStateExtra)
+  = ShardStateUnsplit;
+
+	*/
+	block::gen::ShardStateUnsplit::Record record;
+
+	FullShardStateUnsplit_aux aux;
+
+	FullOutMsgQueueInfo omqi;
+	CellSlice ics;
+
+    FullShardStateUnsplit() : BaseFullCell("ShardStateUnsplit") {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		omqi.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+
+		ics = cs;
+		cs.advance(cs.size());
+		cs.advance_refs(cs.size_refs());
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_ref(omqi.make_std_cell(ctx, indent + 1));
+
+		cb.append_cellslice(ics);
+	}
+};
+
+struct FullShardState : BaseFullCell<ShardState>, td::CntObject {
+    int tag = -1;
+
+		FullShardStateUnsplit shard_state;
+		FullShardStateUnsplit left;
+		FullShardStateUnsplit right;
+
+		FullShardState() : BaseFullCell("ShardState", ShardState()) {
+			
+		}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = type.get_tag(cs);
+		CHECK(tag == type.shard_state || tag == type.split_state);
+		if (tag == type.shard_state) {
+			shard_state.unpack_std(ctx, cs, indent + 1);
+		} else {
+			cs.advance(32);
+			left.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+			right.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		}
+
+		// minify-remove
+		CHECK(cs.empty_ext());
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		CHECK(tag == type.shard_state || tag == type.split_state);
+
+		if (tag == type.shard_state) {
+			shard_state.pack_std(ctx, cb, indent + 1);
+		} else {
+			cb.store_long(type.split_state, 32)
+			.store_ref(left.make_std_cell(ctx, indent + 1))
+			.store_ref(right.make_std_cell(ctx, indent + 1));
+		}
+	}
+};
 
 // struct FullLibDescr : BaseFullCell<block::gen::LibDescr> {
 //     FullLibDescr() : BaseFullCell("LibDescr", block::gen::t_LibDescr) {}
@@ -748,10 +1443,6 @@ struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection
 
 // struct FullMcStateExtra_aux : BaseFullCell<block::gen::McStateExtra_aux> {
 //     FullMcStateExtra_aux() : BaseFullCell("McStateExtra_aux", block::gen::t_McStateExtra_aux) {}
-// };
-
-// struct FullMcStateExtra : BaseFullCell<block::gen::McStateExtra> {
-//     FullMcStateExtra() : BaseFullCell("McStateExtra", block::gen::t_McStateExtra) {}
 // };
 
 // struct FullSigPubKey : BaseFullCell<block::gen::SigPubKey> {
@@ -1072,310 +1763,11 @@ struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection
 
 
 struct FullImportFees;
-template <class TValue, class TExtra>
-struct FullHashmapAug;
-
-struct FullCurrencyCollection : BaseFullCell<CurrencyCollection>, AddValues<block::tlb::CurrencyCollection>
-{
-	FullCurrencyCollection() : BaseFullCell("CurrencyCollection", t_CurrencyCollection), AddValues(block::tlb::t_CurrencyCollection) {}
-};
-
-
-template <class TValue, class TExtra>
-struct FullHashmapAugNode : BaseFullCell<block::gen::HashmapAugNode>
-{
-	/*
-
-	ahmn_leaf#_
-		{X:Type}
-		{Y:Type}
-
-		extra:Y
-		value:X
-	= HashmapAugNode 0 X Y;
-
-	ahmn_fork#_
-		{n:#}
-		{X:Type}
-		{Y:Type}
-
-		left:^(HashmapAug n X Y)
-		right:^(HashmapAug n X Y)
-		extra:Y
-	= HashmapAugNode (n + 1) X Y;
-
-	*/
-
-	int tag = -1;
-	int n = -1;
-	Ref<FullHashmapAug<TValue, TExtra>> left;
-	Ref<FullHashmapAug<TValue, TExtra>> right;
-
-	TValue value;
-	TExtra extra;
-
-	FullHashmapAugNode(int m,  const TLB &X, const TLB &Y) : BaseFullCell("HashmapAugNode", block::gen::HashmapAugNode(m, X, Y)) {}
-
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		tag = type.check_tag(cs);
-		// minify-remove
-		CHECK(tag == block::gen::HashmapAugNode::ahmn_leaf || tag == block::gen::HashmapAugNode::ahmn_fork);
-
-		if (tag == 0) // HashmapAugNode::ahmn_leaf
-		{
-			// minify-remove
-			CHECK(type.m_ == 0);
-			extra.unpack_std(ctx, cs, indent + 1);
-			value.unpack_std(ctx, cs, indent + 1, true);
-		}
-		else
-		{
-			int n;
-			add_r1(n, 1, type.m_);
-
-			left = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
-			left.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
-
-			right = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
-			right.write().cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
-
-			extra.unpack_std(ctx, cs, indent + 1);
-		}
-	}
-
-	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		// minify-remove
-		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
-
-		if (tag == 0) // HashmapAugNode::ahmn_leaf
-		{
-			// minify-remove
-			CHECK(type.m_ == 0);
-			value.pack_opt(ctx, cb, indent + 1);
-		}
-		else {
-			int n;
-			CHECK(add_r1(n, 1, type.m_));
-			cb.store_ref(left.write().make_opt_cell(ctx, indent + 1));
-			cb.store_ref(right.write().make_opt_cell(ctx, indent + 1));
-		}
-	}
-
-	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		tag = type.check_tag(cs);
-		// minify-remove
-		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
-
-		if (tag == 0) // HashmapAugNode::ahmn_leaf
-		{
-			// minify-remove
-			CHECK(type.m_ == 0);
-			value.unpack_opt(ctx, cs, indent + 1);
-			auto extra_cs = value.calc_aug_data();
-			extra.unpack_opt(ctx, extra_cs, indent + 1, true);
-			// minify-remove
-			CHECK(cs.empty_ext());
-		}
-		else
-		{
-			int n;
-			add_r1(n, 1, type.m_);
-
-			left = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
-			left.write().cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
-
-			right = Ref<FullHashmapAug<TValue, TExtra>>(true, n, type.X_, type.Y_);
-			right.write().cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
-
-			auto left_extra_cs = to_cs(left.write().node.extra.make_std_cell(ctx));
-			auto right_extra_cs = to_cs(right.write().node.extra.make_std_cell(ctx));
-
-			auto extra_cs = extra.add_values(left_extra_cs, right_extra_cs);
-			extra.unpack_opt(ctx, extra_cs, indent + 1, true);
-		}
-	}
-
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		// minify-remove
-		CHECK(tag == HashmapAugNode::ahmn_leaf || tag == HashmapAugNode::ahmn_fork);
-
-		if (tag == 0) // HashmapAugNode::ahmn_leaf
-		{
-			// minify-remove
-			CHECK(type.m_ == 0);
-			extra.pack_std(ctx, cb, indent + 1);
-			value.pack_std(ctx, cb, indent + 1);
-		}
-		else {
-			int n;
-			CHECK(add_r1(n, 1, type.m_));
-			cb.store_ref(left.write().make_std_cell(ctx, indent + 1));
-			cb.store_ref(right.write().make_std_cell(ctx, indent + 1));
-			extra.pack_std(ctx, cb, indent + 1);
-		}
-	}
-};
-
-template <class TValue, class TExtra>
-struct FullHashmapAug : BaseFullCell<block::gen::HashmapAug>, td::CntObject
-{
-	/*
-
-	ahm_edge#_
-		{n:#}
-		{X:Type}
-		{Y:Type}
-		{l:#}
-		{m:#}
-		label:(HmLabel ~l n) {n = (~m) + l}
-		node:(HashmapAugNode m X Y)
-	= HashmapAug n X Y;
-
-	*/
-	block::gen::HashmapAug::Record record;
-
-	FullHashmapAugNode<TValue, TExtra> node;
-
-	FullHashmapAug(int n, const TLB &X, const TLB &Y) : BaseFullCell("HashmapAug", block::gen::HashmapAug(n, X, Y)), node(n, X, Y) {}
-
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		CHECK(type.unpack(cs, record));
-		node.type.m_ = record.m;
-		node.unpack_std(ctx, record.node.write(), indent + 1);
-	}
-
-	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		int l, m;
-		CHECK(
-				tlb::store_from(cb, HmLabel{type.m_}, record.label, l)
-      && add_r1(m, l, type.m_)
-		);
-		node.pack_opt(ctx, cb, indent + 1);
-	}
-
-	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		CHECK(
-			(record.n = type.m_) >= 0
-      && block::gen::HmLabel{type.m_}.fetch_to(cs, record.label, record.l)
-      && add_r1(record.m, record.l, type.m_)
-		);
-		node.type.m_ = record.m;
-		node.unpack_opt(ctx, cs, indent + 1);
-	}
-
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		int l, m;
-		CHECK(
-				tlb::store_from(cb, block::gen::HmLabel{type.m_}, record.label, l)
-      && add_r1(m, l, type.m_)
-		);
-		node.pack_std(ctx, cb, indent + 1);
-	}
-};
-
-template <class TValue, class TExtra>
-struct FullHashmapAugE : BaseFullCell<block::gen::HashmapAugE>
-{
-	/*
-	ahme_empty$0
-		{n:#}
-		{X:Type}
-		{Y:Type}
-
-		extra:Y
-	= HashmapAugE n X Y;
-
-	ahme_root$1
-		{n:#}
-		{X:Type}
-		{Y:Type}
-
-		root:^(HashmapAug n X Y)
-		extra:Y
-	= HashmapAugE n X Y;
-	*/
-
-	block::gen::HashmapAugE::Record_ahme_root r;
-
-	int tag = -1;
-	FullHashmapAug<TValue, TExtra> root;
-	TExtra extra;
-
-	FullHashmapAugE(int n, const TLB &X, const TLB &Y) : BaseFullCell("HashmapAugE", block::gen::HashmapAugE(n, X, Y)), root(n, X, Y) {}
-
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
-	{
-		tag = type.check_tag(cs);
-		// minify-remove
-		CHECK(tag == block::gen::HashmapAugE::ahme_empty || tag == block::gen::HashmapAugE::ahme_root)
-
-		if (tag == block::gen::HashmapAugE::ahme_empty)
-		{
-			CHECK(cs.fetch_ulong(1) == 0);
-			extra.unpack_std(ctx, cs, indent + 1);
-		}
-		else 
-		{
-			CHECK(type.unpack(cs, r));
-
-			root.cell_unpack_std(ctx, r.root, indent + 1);
-			extra.unpack_std(ctx, r.extra.write(), indent + 1);
-		}
-	}
-
-	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
-	{
-		// minify-remove
-		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
-
-		if (tag == HashmapAugE::ahme_empty) {
-			cb.store_long(0, 1);
-			extra.pack_opt(ctx, cb, indent + 1);
-		} else {
-			cb.store_long(1, 1).store_ref(root.make_opt_cell(ctx, indent + 1));
-			extra.pack_opt(ctx, cb, indent + 1);
-		}
-	}
-
-	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override
-	{
-		tag = type.check_tag(cs);
-		// minify-remove
-		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
-
-		if (tag == HashmapAugE::ahme_empty)
-		{
-			CHECK(cs.fetch_ulong(1) == 0);
-			extra.unpack_opt(ctx, cs, indent + 1);
-		}
-		else
-		{
-			CHECK(cs.fetch_ulong(1) == 1 && (r.n = type.m_) >= 0);
-			auto root_ref = cs.fetch_ref();
-			root.cell_unpack_opt(ctx, root_ref, indent + 1);
-			extra = root.node.extra;
-		}
-	}
-
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		// minify-remove
-		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
-
-		if (tag == HashmapAugE::ahme_empty) {
-			cb.store_long(0, 1);
-			extra.pack_std(ctx, cb, indent + 1);
-		} else {
-			cb.store_long(1, 1)
-			.store_ref(root.make_std_cell(ctx, indent + 1));
-			extra.pack_std(ctx, cb, indent + 1);
-		} 
-	}
-};
 
 struct FullOutMsgDescr : BaseFullCell<OutMsgDescr> {
-	FullHashmapAugE<FullOutMsg, FullCurrencyCollection> x{256, t_OutMsg, t_CurrencyCollection};
+	FullHashmapAugE<FullOutMsg, FullCurrencyCollection> x{256, tOM, tCC};
 
-	FullOutMsgDescr() : BaseFullCell("OutMsgDescr", t_OutMsgDescr) {}
+	FullOutMsgDescr() : BaseFullCell("OutMsgDescr", OutMsgDescr()) {}
 
 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
 	{
@@ -1395,22 +1787,21 @@ struct FullOutMsgDescr : BaseFullCell<OutMsgDescr> {
 	}
 };
 
-// struct FullOutMsgQueue : BaseFullCell<block::gen::OutMsgQueue> {
-//     FullOutMsgQueue() : BaseFullCell("OutMsgQueue", block::gen::t_OutMsgQueue) {}
-// };
 
 /// gen end
 
-struct FullImportFees : BaseFullCell<ImportFees>, AddValues<block::tlb::ImportFees>
+
+
+struct FullImportFees : BaseFullCell<ImportFees>, AddValues<ImportFees>
 {
-	FullImportFees() : BaseFullCell("ImportFees", t_ImportFees), AddValues(block::tlb::t_ImportFees) {}
+	FullImportFees() : BaseFullCell("ImportFees", tIF), AddValues(tIF) {}
 };
 
 struct FullInMsgDescr : BaseFullCell<InMsgDescr>
 {
-	FullHashmapAugE<FullInMsg, FullImportFees> x{256, t_InMsg, t_ImportFees};
+	FullHashmapAugE<FullInMsg, FullImportFees> x{256, tIM, tIF};
 
-	FullInMsgDescr(): BaseFullCell("InMsgDescr", t_InMsgDescr) {}
+	FullInMsgDescr(): BaseFullCell("InMsgDescr", InMsgDescr()) {}
 
 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
 	{
@@ -1429,6 +1820,10 @@ struct FullInMsgDescr : BaseFullCell<InMsgDescr>
 		x.pack_std(ctx, cb, indent + 1);
 	}
 };
+
+const block::gen::McBlockExtra tMBE{};
+const block::gen::RefT tRMBE{tMBE};
+const block::gen::Maybe tMRMBE(tRMBE);
 
 struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
 {
@@ -1464,7 +1859,7 @@ struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
 				.store_ref(record.account_blocks)
 				.store_bits(record.rand_seed.cbits(), 256)
 				.store_bits(record.created_by.cbits(), 256);
-		CHECK(block::gen::t_Maybe_Ref_McBlockExtra.store_from(cb, record.custom));
+		CHECK(tMRMBE.store_from(cb, record.custom));
 	}
 
 	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
@@ -1475,7 +1870,7 @@ struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
       cs.fetch_ref_to(record.account_blocks)
       && cs.fetch_bits_to(record.rand_seed.bits(), 256)
       && cs.fetch_bits_to(record.created_by.bits(), 256)
-      && block::gen::t_Maybe_Ref_McBlockExtra.fetch_to(cs, record.custom)
+      && tMRMBE.fetch_to(cs, record.custom)
 		);
 	}
 
@@ -1486,7 +1881,7 @@ struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
 				.store_ref(record.account_blocks)
 				.store_bits(record.rand_seed.cbits(), 256)
 				.store_bits(record.created_by.cbits(), 256);
-		CHECK(block::gen::t_Maybe_Ref_McBlockExtra.store_from(cb, record.custom));
+		CHECK(tMRMBE.store_from(cb, record.custom));
 	}
 };
 
@@ -1494,9 +1889,10 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 {
 	block::gen::Block::Record record;
 
+	FullMERKLE_UPDATE<FullShardState> state_update;
 	FullBlockExtra extra;
 
-	FullBlock(): BaseFullCell("Block", block::gen::t_Block) {
+	FullBlock(): BaseFullCell("Block", block::gen::t_Block), state_update(FullShardState()) {
 
 	}
 
@@ -1504,6 +1900,7 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 	{
 		CHECK(type.unpack(cs, record));
 
+		state_update.cell_unpack_std(ctx, record.state_update, indent + 1);
 		extra.cell_unpack_std(ctx, record.extra, indent + 1, true);
 		// minify-remove
 		CHECK(cs.empty_ext());
@@ -1515,7 +1912,7 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 		cb.store_long(record.global_id, 32)
 				.store_ref(record.info)
 				.store_ref(record.value_flow)
-				.store_ref(record.state_update)
+				.store_ref(state_update.make_opt_cell(ctx, indent + 1))
 				.store_ref(extra.make_opt_cell(ctx, indent + 1));
 	}
 
@@ -1525,8 +1922,8 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 			cs.fetch_int_to(32, record.global_id)
       && cs.fetch_ref_to(record.info)
       && cs.fetch_ref_to(record.value_flow)
-      && cs.fetch_ref_to(record.state_update)
 		);
+		state_update.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
 		extra.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1, true);
 	}
 
@@ -1536,7 +1933,7 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 				.store_long(record.global_id, 32)
 				.store_ref(record.info)
 				.store_ref(record.value_flow)
-				.store_ref(record.state_update)
+				.store_ref(state_update.make_std_cell(ctx, indent + 1))
 				.store_ref(extra.make_std_cell(ctx, indent + 1));
 	}
 };
@@ -1600,7 +1997,7 @@ td::BufferSlice decompress(td::Slice data) {
 
 	// auto decompressed = td::lz4_decompress(data, 10'000'000).move_as_ok();
 	auto decompressed = zpaq::decompress(data);
-	auto opt_deser = std_boc_deserialize(decompressed).move_as_ok();
+	auto opt_deser = std_boc_deserialize(decompressed, false, true).move_as_ok();
 
 	FullBlock opt_block;
 	ParseContext parse_opt_ctx{ofs};
@@ -1722,7 +2119,7 @@ int main()
 
 	auto compressed_b64_decoded = td::base64_decode(compressed_b64);
 	auto decompressed = td::lz4_decompress(compressed_b64_decoded, 10'000'000).move_as_ok();
-	auto opt_deser = vm::std_boc_deserialize(decompressed).move_as_ok();
+	auto opt_deser = vm::std_boc_deserialize(decompressed, false, true).move_as_ok();
 
 	cout << "\nLoading optimized block..." << endl; 
 	FullBlock opt_block;

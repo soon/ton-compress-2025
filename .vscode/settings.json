@@ -84,6 +84,11 @@
     "alignedvector3": "cpp",
     "hash_map": "cpp",
     "bvh": "cpp",
-    "*.ipp": "cpp"
+    "*.ipp": "cpp",
+    "format": "cpp",
+    "iterator": "cpp",
+    "random": "cpp",
+    "matrixfunctions": "cpp",
+    "polynomials": "cpp"
   }
 }

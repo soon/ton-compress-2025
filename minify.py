@@ -41,6 +41,7 @@ keywords = {
     "auto",
     "template",
     "true",
+    "continue",
 }
 
 requires_define = {
@@ -62,6 +63,13 @@ requires_define = {
     "fetch_ref",
     "blen",
     "CurrencyCollection",
+    "append_cellslice",
+    "special_type",
+    "state_update",
+    "skip",
+    "ShardStateUnsplit",
+    "shard_state",
+    "as_cellslice",
 }
 
 cannot_be_replaced = {
@@ -169,6 +177,7 @@ def minify_cpp(source_code):
     # Remove single-line comments (//)
     source_code = re.sub(r'//.*', '', source_code)
 
+
     # Remove leading and trailing whitespaces from each line
     lines = [line.strip() for line in source_code.splitlines()]
     lines = [x for x in lines if x]
@@ -243,7 +252,7 @@ def minify_cpp(source_code):
     res = re.sub(r'\bE\([^)]*\);', 'E(0);', res)
     res = re.sub(r'(?<!\*)(\s+\=\s+)', '=', res)
 
-    res = replace_tokens(res, 130)
+    res = replace_tokens(res, 150)
 
     return res
 
