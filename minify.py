@@ -42,6 +42,8 @@ keywords = {
     "template",
     "true",
     "continue",
+    "else",
+    "false",
 }
 
 requires_define = {
@@ -70,6 +72,8 @@ requires_define = {
     "ShardStateUnsplit",
     "shard_state",
     "as_cellslice",
+    "ShardFeeCreated",
+    "fetch_ulong",
 }
 
 cannot_be_replaced = {

@@ -39,14 +39,20 @@ set<string> enabled_optimizations{
 
 	"InMsgDescr",
 	"OutMsgDescr",
+	"McBlockExtra",
+	"ShardFees",
+
+	// "AccountBlock",
+	"ShardAccountBlocks",
 
 	"MERKLE_UPDATE",
-	"ShardState",
-	"ShardStateUnsplit",
-	"OutMsgQueueInfo",
-	// "OutMsgQueue", // nothing to compress as it is part of merkle update, many pruned branches
-
+	// "ShardState",
+	// "ShardStateUnsplit",
+	// "OutMsgQueueInfo",
+	// "OutMsgQueue",
 	// "ShardStateUnsplit_aux",
+
+	"Maybe",
 };
 
 CellSlice to_cs(Ref<Cell> cell)
@@ -88,6 +94,8 @@ struct BaseFullCell
 	CellSlice incoming_cs;
 	// and this may be null if optimization is enabled for cell and we're reading opt cs
 	CellSlice std_cell_cs;
+	// custom cell slice, useful to read until the end of the cell
+	CellSlice ccs;
 
 	string name;
 	T_TLB type;
@@ -209,13 +217,20 @@ struct BaseFullCell
 		auto added_bin = new_bin.substr(current_bin.length());
 		auto added_refs = cb.size_refs() - current_refs;
 
-		ctx.indent(indent) << (name + ".pack_opt ") 
+		ctx.indent(indent) << (name + ".pack_opt added ") 
 											 << (e ? "" : "(disabled) ") 
 											 << "{" << special_type << "}" 
 											 << "-:" 
 											 << added_bin.length() << ":" 
 											 << added_refs 
 											 << "[" << bin_to_hex(added_bin) << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_opt added ") 
+											 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}" 
+											 << "-:" 
+											 << added_bin.length() << ":" 
+											 << added_refs 
+											 << "[" << added_bin << "]" << endl;
 		ctx.indent(indent) << (name + ".pack_opt full ") 
 											 << (e ? "" : "(disabled) ") 
 											 << "{" << special_type << "}" 
@@ -223,6 +238,13 @@ struct BaseFullCell
 											 << cb.size() << ":" 
 											 << cb.size_refs() 
 											 << "[" << new_cs.as_bitslice().to_hex() << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_opt full ") 
+											 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}" 
+											 << (int)new_cs.special_type() << ":" 
+											 << cb.size() << ":" 
+											 << cb.size_refs() 
+											 << "[" << new_cs.as_bitslice().to_binary() << "]" << endl;
 		// minify-remove:end
 	}
 
@@ -256,12 +278,15 @@ struct BaseFullCell
 
 		// minify-remove:start
 		auto current_cs = cb.as_cellslice();
+		auto current_bin = current_cs.as_bitslice().to_binary();
+		auto current_refs = cb.size_refs();
+
 		ctx.indent(indent) << (name + ".pack_std begin ") 
 		    							 << (e ? "" : "(disabled) ") 
 											 << "{" << special_type << "}"
 											 << (int)current_cs.special_type() << ":"
 											 << cb.size() << ":"
-											 << cb.size_refs() 
+											 << current_refs
 											 << "[" << current_cs.as_bitslice().to_hex() << "]" << endl;
 		// minify-remove:end
 
@@ -278,20 +303,39 @@ struct BaseFullCell
 
 		// minify-remove:start
 		auto new_cs = cb.as_cellslice();
-		ctx.indent(indent) << (name + ".pack_std ") 
+		auto new_bs = new_cs.as_bitslice();
+		auto new_bin = new_bs.to_binary();
+		auto added_bin = new_bin.substr(current_bin.length());
+		auto added_refs = cb.size_refs() - current_refs;
+
+		ctx.indent(indent) << (name + ".pack_std added ") 
 											 << (e ? "" : "(disabled) ") 
-											 << "{" << special_type << "}"
-											 << (int)new_cs.special_type() << ":"
-											 << cb.size() << ":"
-											 << cb.size_refs() 
-											 << "[" << new_cs.as_bitslice().to_hex() << "]" << endl;
-		ctx.indent(indent) << (name + ".pack_std ") 
+											 << "{" << special_type << "}" 
+											 << "-:" 
+											 << added_bin.length() << ":" 
+											 << added_refs 
+											 << "[" << bin_to_hex(added_bin) << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_std added ") 
+											 << (e ? "" : "(disabled) ") 
+											 << "{" << special_type << "}" 
+											 << "-:" 
+											 << added_bin.length() << ":" 
+											 << added_refs 
+											 << "[" << added_bin << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_std full ") 
 		 									 << (e ? "" : "(disabled) ") 
 											 << "{" << special_type << "}"
 											 << (int)new_cs.special_type() << ":"
 											 << cb.size() << ":"
 											 << cb.size_refs() 
-											 << "[" << new_cs.as_bitslice().to_binary() << "]" << endl;
+											 << "[" << new_cs.as_bitslice().to_hex() << "]" << endl;
+		ctx.indent(indent) << (name + ".pack_std full ") 
+										<< (e ? "" : "(disabled) ") 
+										<< "{" << special_type << "}"
+										<< (int)new_cs.special_type() << ":"
+										<< cb.size() << ":"
+										<< cb.size_refs() 
+										<< "[" << new_cs.as_bitslice().to_binary() << "]" << endl;
 		// minify-remove:end
 	}
 
@@ -307,7 +351,7 @@ struct BaseFullCell
 											 << (int)cs.special_type() << ":"
 											 << cb.size() << ":"
 											 << cb.size_refs() 
-											 << "[" << cs.as_bitslice().to_binary() << "]" << endl;
+											 << "[" << cs.as_bitslice().to_hex() << "]" << endl;
 		ctx.indent(indent) << "------------------- " << name << " std cell end -------------------" << endl;
 		// minify-remove:end
 		return cb.finalize(special_type!=0);
@@ -325,7 +369,7 @@ struct BaseFullCell
 											 << (int)cs.special_type() << ":"
 											 << cb.size() << ":"
 											 << cb.size_refs() 
-											 << "[" << cs.as_bitslice().to_binary() << "]" << endl;
+											 << "[" << cs.as_bitslice().to_hex() << "]" << endl;
 		ctx.indent(indent) << "------------------- " << name << " opt cell end -------------------" << endl;
 		// minify-remove:end
 		return cb.finalize(special_type!=0);
@@ -343,9 +387,24 @@ struct BaseFullCell
 		auto cs = to_cs(std::move(cell_ref));
 		unpack_opt(ctx, cs, indent, check_empty);
 	}
+
+	void fetch_remaining(CellSlice& cs) {
+		// minify-remove
+		CHECK(!cs.empty_ext());
+		ccs = cs;
+		cs.advance(cs.size());
+		cs.advance_refs(cs.size_refs());
+		// minify-remove
+		CHECK(cs.empty_ext());
+	}
+
+	void append_remaining(CellBuilder& cb) {
+		// minify-remove
+		CHECK(!ccs.empty_ext());
+		cb.append_cellslice(ccs);
+	}
 };
 
-template <class TExtra>
 struct AugDataProvider {
 	virtual ~AugDataProvider() {}
 
@@ -376,10 +435,12 @@ using namespace block::tlb;
 
 const CurrencyCollection tCC;
 const OutMsg tOM;
+const AccountBlock tAB;
 const ImportFees tIF;
 const InMsg tIM;
 const EnqueuedMsg tEM;
 const UInt tU64{64};
+const ShardFeeCreated tSFC;
 
 /// HashmapAug 
 
@@ -590,6 +651,19 @@ struct FullHashmapAug : BaseFullCell<block::gen::HashmapAug>, td::CntObject
 	}
 };
 
+
+/*
+_ (HashmapAugE 256 InMsg ImportFees) = InMsgDescr; // done 
+_ (HashmapAugE 256 OutMsg CurrencyCollection) = OutMsgDescr; // done 
+_ (HashmapAugE 352 EnqueuedMsg uint64) = OutMsgQueue; // within MU
+_ (HashmapAugE 256 AccountDispatchQueue uint64) = DispatchQueue; // within MU
+_ (HashmapAugE 256 ShardAccount DepthBalanceInfo) = ShardAccounts; // within MU
+_ (HashmapAugE 256 AccountBlock CurrencyCollection) = ShardAccountBlocks; // done
+_ (HashmapAugE 96 ShardFeeCreated ShardFeeCreated) = ShardFees; // done
+_ (HashmapAugE 32 KeyExtBlkRef KeyMaxLt) = OldMcBlocksInfo; // within MU
+block_create_stats_ext#34 counters:(HashmapAugE 256 CreatorStats uint32) = BlockCreateStats; // within MU
+*/
+
 template <class TValue, class TExtra>
 struct FullHashmapAugE : BaseFullCell<block::gen::HashmapAugE>
 {
@@ -648,11 +722,10 @@ struct FullHashmapAugE : BaseFullCell<block::gen::HashmapAugE>
 		CHECK(tag == HashmapAugE::ahme_empty || tag == HashmapAugE::ahme_root)
 
 		if (tag == HashmapAugE::ahme_empty) {
-			cb.store_long(0, 1);
-			extra.pack_opt(ctx, cb, indent + 1);
+ 			cb.store_long(0, 1);
+			extra.pack_opt(ctx, cb, indent + 1); // todo don't pack calc automatically
 		} else {
 			cb.store_long(1, 1).store_ref(root.make_opt_cell(ctx, indent + 1));
-			extra.pack_opt(ctx, cb, indent + 1);
 		}
 	}
 
@@ -694,13 +767,13 @@ struct FullHashmapAugE : BaseFullCell<block::gen::HashmapAugE>
 
 /// gen start
 
-struct FullUInt : BaseFullCell<UInt>, AddValues<UInt> {
-	FullUInt(string name, UInt type) : BaseFullCell(name, type), AddValues(type) {}
-};
+// struct FullUInt : BaseFullCell<UInt>, AddValues<UInt> {
+// 	FullUInt(string name, UInt type) : BaseFullCell(name, type), AddValues(type) {}
+// };
 
-struct FullUInt64 : FullUInt {
-    FullUInt64() : FullUInt("Unit64", tU64) {}
-};
+// struct FullUInt64 : FullUInt {
+//     FullUInt64() : FullUInt("Unit64", tU64) {}
+// };
 
 
 // struct FullUnit : BaseFullCell<block::gen::Unit> {
@@ -723,9 +796,67 @@ struct FullUInt64 : FullUInt {
 //     FullBoolTrue() : BaseFullCell("BoolTrue", block::gen::t_BoolTrue) {}
 // };
 
-// struct FullMaybe : BaseFullCell<block::gen::Maybe> {
-//     FullMaybe() : BaseFullCell("Maybe", block::gen::t_Maybe) {}
-// };
+template <class T>
+struct FullMaybe : BaseFullCell<TLB> {
+	// nothing$0 {X:Type} = Maybe X;
+	// just$1 {X:Type} value:X = Maybe X;
+
+	T value;
+	int tag = -1;
+	bool is_ref;
+
+	FullMaybe(bool is_ref=false) : BaseFullCell("Maybe"), is_ref(is_ref) {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = cs.fetch_ulong(1);
+		if (tag) {
+			if (is_ref) {
+				value.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+			} else {
+				value.unpack_std(ctx, cs, indent + 1);
+			}
+		}
+	}
+
+	virtual void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == 0 || tag == 1);
+
+  	CHECK(cb.store_long_bool(tag, 1));
+		if (tag) {
+			if (is_ref) {
+				cb.store_ref(value.make_opt_cell(ctx, indent + 1));
+			} else {
+				value.pack_opt(ctx, cb, indent + 1);
+			}
+		}
+	}
+
+	virtual void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = cs.fetch_ulong(1);
+		if (tag) {
+			if (is_ref) {
+				value.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+			} else {
+				value.unpack_opt(ctx, cs, indent + 1);
+			}
+		}
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		// minify-remove
+		CHECK(tag == 0 || tag == 1);
+
+  	CHECK(cb.store_long_bool(tag, 1));
+		if (tag) {
+			if (is_ref) {
+				cb.store_ref(value.make_std_cell(ctx, indent + 1));
+			} else {
+				value.pack_std(ctx, cb, indent + 1);
+			}
+		}
+	}
+};
 
 // struct FullEither : BaseFullCell<block::gen::Either> {
 //     FullEither() : BaseFullCell("Either", block::gen::t_Either) {}
@@ -873,7 +1004,7 @@ struct FullUInt64 : FullUInt {
 
 struct FullImportFees;
 
-struct FullInMsg : BaseFullCell<InMsg>, AugDataProvider<FullImportFees> {
+struct FullInMsg : BaseFullCell<InMsg>, AugDataProvider {
     FullInMsg() : BaseFullCell("InMsg", InMsg()) {}
 
 	CellSlice calc_aug_data() override {
@@ -889,7 +1020,7 @@ struct FullCurrencyCollection : BaseFullCell<CurrencyCollection>, AddValues<Curr
 	FullCurrencyCollection() : BaseFullCell("CurrencyCollection") {}
 };
 
-struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection> {
+struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider {
     FullOutMsg() : BaseFullCell("OutMsg", OutMsg()) {}
 
 	CellSlice calc_aug_data() override {
@@ -900,29 +1031,34 @@ struct FullOutMsg : BaseFullCell<OutMsg>, AugDataProvider<FullCurrencyCollection
 	}
 };
 
-struct EnqueuedMsgAug : FullUInt64 {
-	CellSlice add_values(CellSlice& cs1, CellSlice& cs2) override {
-		CellBuilder cb;
-		unsigned long long x, y;
-		CHECK(
-			cs1.fetch_ulong_bool(64, x) && 
-			cs2.fetch_ulong_bool(64, y) &&
-      cb.store_ulong_rchk_bool(std::min(x, y), 64)
-		);
-		return cb.as_cellslice();
-	}
-};
+// Disabled as part of merkle update
+//
+// struct EnqueuedMsgAug : FullUInt64 {
+// 	CellSlice add_values(CellSlice& cs1, CellSlice& cs2) override {
+// 		CellBuilder cb;
+// 		unsigned long long x, y;
+// 		CHECK(
+// 			cs1.fetch_ulong_bool(64, x) && 
+// 			cs2.fetch_ulong_bool(64, y) &&
+//       cb.store_ulong_rchk_bool(std::min(x, y), 64)
+// 		);
+// 		return cb.as_cellslice();
+// 	}
+// };
 
-struct FullEnqueuedMsg : BaseFullCell<EnqueuedMsg>, AugDataProvider<EnqueuedMsgAug> {
-    FullEnqueuedMsg() : BaseFullCell("EnqueuedMsg") {}
 
-	CellSlice calc_aug_data() override {
-		CellBuilder cb;
-		auto cs_copy = std_cell_cs;
-		CHECK(Aug_OutMsgQueue().eval_leaf(cb, cs_copy));
-		return cb.as_cellslice();
-	}
-};
+// Disabled as part of merkle update
+//
+// struct FullEnqueuedMsg : BaseFullCell<EnqueuedMsg>, AugDataProvider {
+//     FullEnqueuedMsg() : BaseFullCell("EnqueuedMsg") {}
+//
+// 	CellSlice calc_aug_data() override {
+// 		CellBuilder cb;
+// 		auto cs_copy = std_cell_cs;
+// 		CHECK(Aug_OutMsgQueue().eval_leaf(cb, cs_copy));
+// 		return cb.as_cellslice();
+// 	}
+// };
 
 // struct FullProcessedUpto : BaseFullCell<block::gen::ProcessedUpto> {
 //     FullProcessedUpto() : BaseFullCell("ProcessedUpto", block::gen::t_ProcessedUpto) {}
@@ -952,62 +1088,64 @@ struct FullEnqueuedMsg : BaseFullCell<EnqueuedMsg>, AugDataProvider<EnqueuedMsgA
 //     FullOutMsgQueueExtra() : BaseFullCell("OutMsgQueueExtra", block::gen::t_OutMsgQueueExtra) {}
 // };
 
-struct FullOutMsgQueue : BaseFullCell<OutMsgQueue> {
-	/* 
-	_ (HashmapAugE 352 EnqueuedMsg uint64) = OutMsgQueue;
 
-	*/
+// Disabled as part of merkle update
+//
+// struct FullOutMsgQueue : BaseFullCell<OutMsgQueue> {
+// 	/* 
+// 	_ (HashmapAugE 352 EnqueuedMsg uint64) = OutMsgQueue;
+//
+// 	*/
+//
+// 	FullHashmapAugE<FullEnqueuedMsg, EnqueuedMsgAug> x{352, tEM, tU64};
+//
+// 	FullOutMsgQueue(): BaseFullCell("OutMsgQueue", OutMsgQueue()) {}
+//
+// 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+// 		x.unpack_std(ctx, cs, indent + 1);
+// 	}
+//
+// 	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+// 		x.pack_opt(ctx, cb, indent + 1);
+// 	}
+//
+// 	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+// 		x.unpack_opt(ctx, cs, indent + 1);
+// 	}
+//
+// 	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+// 		x.pack_std(ctx, cb, indent + 1);
+// 	}
+// };
 
-	FullHashmapAugE<FullEnqueuedMsg, EnqueuedMsgAug> x{352, tEM, tU64};
+// Disabled as part of merkle update
+//
+// struct FullOutMsgQueueInfo : BaseFullCell<OutMsgQueueInfo> {
+// 	/*
+//	
+// 	_ 
+// 		out_queue:OutMsgQueue 
+// 		proc_info:ProcessedInfo
+//   	extra:(Maybe OutMsgQueueExtra) 
+// 	= OutMsgQueueInfo;
+// 	*/
+//
+// 	FullOutMsgQueue out_queue;
+//
+// 	FullOutMsgQueueInfo() : BaseFullCell("OutMsgQueueInfo") {}
+//
+//
+// 	virtual void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) {
+// 		out_queue.unpack_std(ctx, cs, indent + 1);
+// 		fetch_remaining(cs);
+// 	}
+//
+// 	virtual void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
+// 		out_queue.pack_std(ctx, cb, indent + 1);
+// 		append_remaining(cb);
+// 	}
+// };
 
-	FullOutMsgQueue(): BaseFullCell("OutMsgQueue", OutMsgQueue()) {}
-
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		x.unpack_std(ctx, cs, indent + 1);
-	}
-
-	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		x.pack_opt(ctx, cb, indent + 1);
-	}
-
-	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		x.unpack_opt(ctx, cs, indent + 1);
-	}
-
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		x.pack_std(ctx, cb, indent + 1);
-	}
-};
-
-
-struct FullOutMsgQueueInfo : BaseFullCell<OutMsgQueueInfo> {
-	/*
-	
-	_ 
-		out_queue:OutMsgQueue 
-		proc_info:ProcessedInfo
-  	extra:(Maybe OutMsgQueueExtra) 
-	= OutMsgQueueInfo;
-	*/
-
-	CellSlice ics;
-	FullOutMsgQueue out_queue;
-
-	FullOutMsgQueueInfo() : BaseFullCell("OutMsgQueueInfo") {}
-
-
-	virtual void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) {
-		out_queue.unpack_std(ctx, cs, indent + 1);
-		ics = cs;
-		cs.advance(cs.size());
-		cs.advance_refs(cs.size_refs());
-	}
-
-	virtual void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
-		out_queue.pack_std(ctx, cb, indent + 1);
-		cb.append_cellslice(ics);
-	}
-};
 
 // struct FullStorageUsed : BaseFullCell<block::gen::StorageUsed> {
 //     FullStorageUsed() : BaseFullCell("StorageUsed", block::gen::t_StorageUsed) {}
@@ -1057,21 +1195,21 @@ struct FullOutMsgQueueInfo : BaseFullCell<OutMsgQueueInfo> {
 //     FullTransaction() : BaseFullCell("Transaction", block::gen::t_Transaction) {}
 // };
 
-struct MyMERKLE_UPDATE : block::gen::MERKLE_UPDATE {
-	MyMERKLE_UPDATE(const TLB& X) : MERKLE_UPDATE(X) {}
+// struct MyMERKLE_UPDATE : block::gen::MERKLE_UPDATE {
+// 	MyMERKLE_UPDATE(const TLB& X) : MERKLE_UPDATE(X) {}
 
-	bool skip(vm::CellSlice& cs) const override {
-		return cs.advance_ext(0x208, 2);
-  }
-};
+// 	bool skip(vm::CellSlice& cs) const override {
+// 		return cs.advance_ext(0x208, 2);
+//   }
+// };
 
+// don't need block::gen::MERKLE_UPDATE here, therefore just using TLB
 template <class T>
-struct FullMERKLE_UPDATE : BaseFullCell<MyMERKLE_UPDATE> {
+struct FullMERKLE_UPDATE : BaseFullCell<TLB> {
 	/* Optimized by only storing 2 refs instead of tag, hash & levels */
-	Ref<T> from_proof;
-	Ref<T> to_proof;
+	Ref<T> from_proof, to_proof;
 
-	FullMERKLE_UPDATE(const T &type) : BaseFullCell("MERKLE_UPDATE", MyMERKLE_UPDATE(type.type)) {
+	FullMERKLE_UPDATE(const T &type) : BaseFullCell("MERKLE_UPDATE") {
 
 	}
 
@@ -1118,13 +1256,39 @@ struct FullMERKLE_UPDATE : BaseFullCell<MyMERKLE_UPDATE> {
 //     FullMERKLE_PROOF() : BaseFullCell("MERKLE_PROOF", block::gen::t_MERKLE_PROOF) {}
 // };
 
-// struct FullAccountBlock : BaseFullCell<block::gen::AccountBlock> {
-//     FullAccountBlock() : BaseFullCell("AccountBlock", block::gen::t_AccountBlock) {}
-// };
+struct FullAccountBlock : BaseFullCell<AccountBlock>, AugDataProvider {
+	FullAccountBlock() : BaseFullCell("AccountBlock") {}
 
-// struct FullShardAccountBlocks : BaseFullCell<block::gen::ShardAccountBlocks> {
-//     FullShardAccountBlocks() : BaseFullCell("ShardAccountBlocks", block::gen::t_ShardAccountBlocks) {}
-// };
+	CellSlice calc_aug_data() override {
+		CellBuilder cb;
+		auto cs_copy = std_cell_cs;
+		CHECK(Aug_ShardAccountBlocks().eval_leaf(cb, cs_copy));
+		return cb.as_cellslice();
+	}
+};
+
+struct FullShardAccountBlocks : BaseFullCell<block::gen::ShardAccountBlocks> {
+	FullHashmapAugE<FullAccountBlock, FullCurrencyCollection> x{256, tAB, tCC};
+
+	FullShardAccountBlocks() : BaseFullCell("ShardAccountBlocks") {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		x.unpack_std(ctx, cs, indent + 1);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		x.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_std(ctx, cb, indent + 1);
+	}
+};
 
 // struct FullTrStoragePhase : BaseFullCell<block::gen::TrStoragePhase> {
 //     FullTrStoragePhase() : BaseFullCell("TrStoragePhase", block::gen::t_TrStoragePhase) {}
@@ -1202,39 +1366,9 @@ struct FullMERKLE_UPDATE : BaseFullCell<MyMERKLE_UPDATE> {
 //     FullBlkMasterInfo() : BaseFullCell("BlkMasterInfo", block::gen::t_BlkMasterInfo) {}
 // };
 
-struct FullShardStateUnsplit_aux : BaseFullCell<ShardState_aux> {
-    FullShardStateUnsplit_aux() : BaseFullCell("ShardStateUnsplit_aux") {}
-
-	CellSlice ics;
-	Ref<Cell> r1, r2;
-
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		r1 = cs.fetch_ref();
-		// r2 = cs.fetch_ref();
-		ics = cs;
-		// minify-remove
-		CHECK(cs.size_refs() == 0);
-	}
-
-	// // virtual void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) {
-	// // 	do_pack_std(ctx, cb, indent);
-	// // }
-
-	// // virtual void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) {
-	// // 	do_unpack_std(ctx, cs, indent);
-	// // }
-
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		// cb.append_cellslice(ics).store_ref(r1).store_ref(r2);
-		cb.append_cellslice(ics);
-		if (!r1.is_null()) {
-			cb.store_ref(r1);
-		}
-		// if (!r2.is_null()) {
-		// 	cb.store_ref(r2);
-		// }
-	}
-};
+// struct FullShardStateUnsplit_aux : BaseFullCell<ShardState_aux> {
+//     FullShardStateUnsplit_aux() : BaseFullCell("ShardStateUnsplit_aux") {}
+// };
 
 struct MyMcStateExtra : block::gen::McStateExtra {
   bool skip(vm::CellSlice& cs) const override {
@@ -1260,94 +1394,100 @@ struct MyShardStateUnsplit : block::gen::ShardStateUnsplit {
 	}
 };
 
-struct FullShardStateUnsplit : BaseFullCell<MyShardStateUnsplit> {
-	/*
-	todo can optimize tag
+// Disabled as part of merkle update
+// 
+// struct FullShardStateUnsplit : BaseFullCell<MyShardStateUnsplit> {
+// 	/*
+// 	todo can optimize tag
 	
-	shard_state#9023afe2 
-		global_id:int32
-  	shard_id:ShardIdent 
-  	seq_no:uint32 
-		vert_seq_no:#
-  	gen_utime:uint32 
-		gen_lt:uint64
-  	min_ref_mc_seqno:uint32
-  	out_msg_queue_info:^OutMsgQueueInfo
-  	before_split:(## 1)
-  	accounts:^ShardAccounts
-  	^[ 
-			overload_history:uint64 
-			underload_history:uint64
-  		total_balance:CurrencyCollection
-  		total_validator_fees:CurrencyCollection
-  		libraries:(HashmapE 256 LibDescr)
-  		master_ref:(Maybe BlkMasterInfo) 
-		]
-  	custom:(Maybe ^McStateExtra)
-  = ShardStateUnsplit;
+// 	shard_state#9023afe2 
+// 		global_id:int32
+//   	shard_id:ShardIdent 
+//   	seq_no:uint32 
+// 		vert_seq_no:#
+//   	gen_utime:uint32 
+// 		gen_lt:uint64
+//   	min_ref_mc_seqno:uint32
+//   	out_msg_queue_info:^OutMsgQueueInfo
+//   	before_split:(## 1)
+//   	accounts:^ShardAccounts
+//   	^[ 
+// 			overload_history:uint64 
+// 			underload_history:uint64
+//   		total_balance:CurrencyCollection
+//   		total_validator_fees:CurrencyCollection
+//   		libraries:(HashmapE 256 LibDescr)
+//   		master_ref:(Maybe BlkMasterInfo) 
+// 		]
+//   	custom:(Maybe ^McStateExtra)
+//   = ShardStateUnsplit;
 
-	*/
-	block::gen::ShardStateUnsplit::Record record;
+// 	*/
+// 	block::gen::ShardStateUnsplit::Record record;
 
-	FullShardStateUnsplit_aux aux;
+// 	FullShardStateUnsplit_aux aux;
 
-	FullOutMsgQueueInfo omqi;
-	CellSlice ics;
+// 	FullOutMsgQueueInfo omqi;
+// 	CellSlice ics;
 
-    FullShardStateUnsplit() : BaseFullCell("ShardStateUnsplit") {}
+//     FullShardStateUnsplit() : BaseFullCell("ShardStateUnsplit") {}
 
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		omqi.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+// 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+// 		omqi.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
 
-		ics = cs;
-		cs.advance(cs.size());
-		cs.advance_refs(cs.size_refs());
-	}
+// 		ics = cs;
+// 		cs.advance(cs.size());
+// 		cs.advance_refs(cs.size_refs());
+// 	}
 
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		cb.store_ref(omqi.make_std_cell(ctx, indent + 1));
+// 	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+// 		cb.store_ref(omqi.make_std_cell(ctx, indent + 1));
 
-		cb.append_cellslice(ics);
-	}
-};
+// 		cb.append_cellslice(ics);
+// 	}
+// };
 
+
+
+// Disabled as part of merkle update
+//
 struct FullShardState : BaseFullCell<ShardState>, td::CntObject {
-    int tag = -1;
+  //   int tag = -1;
 
-		FullShardStateUnsplit shard_state;
-		FullShardStateUnsplit left;
-		FullShardStateUnsplit right;
+	// 	FullShardStateUnsplit shard_state;
+	// 	FullShardStateUnsplit left;
+	// 	FullShardStateUnsplit right;
 
-		FullShardState() : BaseFullCell("ShardState", ShardState()) {
+		FullShardState() : BaseFullCell("ShardState") {
 			
 		}
 
-	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		tag = type.get_tag(cs);
-		CHECK(tag == type.shard_state || tag == type.split_state);
-		if (tag == type.shard_state) {
-			shard_state.unpack_std(ctx, cs, indent + 1);
-		} else {
-			cs.advance(32);
-			left.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
-			right.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
-		}
+	// void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+	// 	tag = type.get_tag(cs);
+	// 	CHECK(tag == type.shard_state || tag == type.split_state);
+	// 	if (tag == type.shard_state) {
+	// 		shard_state.unpack_std(ctx, cs, indent + 1);
+	// 	} else {
+	// 		cs.advance(32);
+	// 		left.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+	// 		right.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+	// 	}
 
-		// minify-remove
-		CHECK(cs.empty_ext());
-	}
+	// 	// minify-remove
+	// 	CHECK(cs.empty_ext());
+	// }
 
-	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
-		CHECK(tag == type.shard_state || tag == type.split_state);
+	// void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+	// 	CHECK(tag == type.shard_state || tag == type.split_state);
 
-		if (tag == type.shard_state) {
-			shard_state.pack_std(ctx, cb, indent + 1);
-		} else {
-			cb.store_long(type.split_state, 32)
-			.store_ref(left.make_std_cell(ctx, indent + 1))
-			.store_ref(right.make_std_cell(ctx, indent + 1));
-		}
-	}
+	// 	if (tag == type.shard_state) {
+	// 		shard_state.pack_std(ctx, cb, indent + 1);
+	// 	} else {
+	// 		cb.store_long(type.split_state, 32)
+	// 		.store_ref(left.make_std_cell(ctx, indent + 1))
+	// 		.store_ref(right.make_std_cell(ctx, indent + 1));
+	// 	}
+	// }
 };
 
 // struct FullLibDescr : BaseFullCell<block::gen::LibDescr> {
@@ -1398,13 +1538,40 @@ struct FullShardState : BaseFullCell<ShardState>, td::CntObject {
 //     FullBinTreeAug() : BaseFullCell("BinTreeAug", block::gen::t_BinTreeAug) {}
 // };
 
-// struct FullShardFeeCreated : BaseFullCell<block::gen::ShardFeeCreated> {
-//     FullShardFeeCreated() : BaseFullCell("ShardFeeCreated", block::gen::t_ShardFeeCreated) {}
-// };
+struct FullShardFeeCreated : BaseFullCell<ShardFeeCreated>, AugDataProvider, AddValues<ShardFeeCreated> {
+    FullShardFeeCreated() : BaseFullCell("ShardFeeCreated") {}
 
-// struct FullShardFees : BaseFullCell<block::gen::ShardFees> {
-//     FullShardFees() : BaseFullCell("ShardFees", block::gen::t_ShardFees) {}
-// };
+	CellSlice calc_aug_data() override {
+		CellBuilder cb;
+		auto cs_copy = std_cell_cs;
+		CHECK(Aug_ShardFees().eval_leaf(cb, cs_copy));
+		return cb.as_cellslice();
+	}
+};
+
+struct FullShardFees : BaseFullCell<block::gen::ShardFees> {
+	FullHashmapAugE<FullShardFeeCreated, FullShardFeeCreated> x{96, tSFC, tSFC};
+
+	FullShardFees() : BaseFullCell("ShardFees") {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
+	{
+		x.unpack_std(ctx, cs, indent + 1);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_opt(ctx, cb, indent + 1);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		x.unpack_opt(ctx, cs, indent + 1);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		x.pack_std(ctx, cb, indent + 1);
+	}
+};
+
 
 // struct FullConfigParams : BaseFullCell<block::gen::ConfigParams> {
 //     FullConfigParams() : BaseFullCell("ConfigParams", block::gen::t_ConfigParams) {}
@@ -1478,9 +1645,55 @@ struct FullShardState : BaseFullCell<ShardState>, td::CntObject {
 //     FullMcBlockExtra_aux() : BaseFullCell("McBlockExtra_aux", block::gen::t_McBlockExtra_aux) {}
 // };
 
-// struct FullMcBlockExtra : BaseFullCell<block::gen::McBlockExtra> {
-//     FullMcBlockExtra() : BaseFullCell("McBlockExtra", block::gen::t_McBlockExtra) {}
-// };
+struct FullMcBlockExtra : BaseFullCell<block::gen::McBlockExtra> {
+	/*
+
+	masterchain_block_extra#cca5
+  key_block:(## 1)
+  shard_hashes:ShardHashes
+  shard_fees:ShardFees
+  ^[ prev_blk_signatures:(HashmapE 16 CryptoSignaturePair)
+     recover_create_msg:(Maybe ^InMsg)
+     mint_msg:(Maybe ^InMsg) ]
+  config:key_block?ConfigParams
+= McBlockExtra;
+	
+	*/
+block::gen::McBlockExtra::Record record;
+
+FullShardFees shard_fees;
+
+FullMcBlockExtra() : BaseFullCell("McBlockExtra") {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		CHECK(cs.fetch_ulong(16) == 0xcca5);
+		CHECK(cs.fetch_bool_to(record.key_block)); 
+		CHECK(block::gen::t_ShardHashes.fetch_to(cs, record.shard_hashes));
+		shard_fees.unpack_std(ctx, cs, indent + 1);
+		fetch_remaining(cs);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_long(record.key_block, 1);
+		block::gen::t_ShardHashes.store_from(cb, record.shard_hashes);
+		shard_fees.pack_opt(ctx, cb, indent + 1);
+		append_remaining(cb);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		CHECK(cs.fetch_bool_to(record.key_block)); 
+		CHECK(block::gen::t_ShardHashes.fetch_to(cs, record.shard_hashes));
+		shard_fees.unpack_opt(ctx, cs, indent + 1);
+		fetch_remaining(cs);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_long(0xcca5, 16).store_long(record.key_block, 1);
+		block::gen::t_ShardHashes.store_from(cb, record.shard_hashes);
+		shard_fees.pack_std(ctx, cb, indent + 1);
+		append_remaining(cb);
+	}
+};
 
 // struct FullValidatorDescr : BaseFullCell<block::gen::ValidatorDescr> {
 //     FullValidatorDescr() : BaseFullCell("ValidatorDescr", block::gen::t_ValidatorDescr) {}
@@ -1768,7 +1981,7 @@ struct FullImportFees;
 struct FullOutMsgDescr : BaseFullCell<OutMsgDescr> {
 	FullHashmapAugE<FullOutMsg, FullCurrencyCollection> x{256, tOM, tCC};
 
-	FullOutMsgDescr() : BaseFullCell("OutMsgDescr", OutMsgDescr()) {}
+	FullOutMsgDescr() : BaseFullCell("OutMsgDescr") {}
 
 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
 	{
@@ -1844,45 +2057,44 @@ struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
 
 	FullInMsgDescr in_msg_descr;
 	FullOutMsgDescr out_msg_descr;
+	FullShardAccountBlocks account_blocks;
+	FullMaybe<FullMcBlockExtra> custom;
 
-	FullBlockExtra(): BaseFullCell("BlockExtra", block::gen::t_BlockExtra) {}
+	FullBlockExtra(): BaseFullCell("BlockExtra"), custom(true) {}
 
 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
-		CHECK(type.unpack(cs, record));
+		CHECK((cs.fetch_ulong(32) == 0x4a33f6fd));
 
-		in_msg_descr.cell_unpack_std(ctx, record.in_msg_descr, indent + 1);
-		out_msg_descr.cell_unpack_std(ctx, record.out_msg_descr, indent + 1);
+		in_msg_descr.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		out_msg_descr.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		account_blocks.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		ccs = cs.fetch_subslice(512).write();
+		custom.unpack_std(ctx, cs, indent + 1);
 	}
 
 	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
 		cb.store_ref(in_msg_descr.make_opt_cell(ctx, indent + 1))
 				.store_ref(out_msg_descr.make_opt_cell(ctx, indent + 1))
-				.store_ref(record.account_blocks)
-				.store_bits(record.rand_seed.cbits(), 256)
-				.store_bits(record.created_by.cbits(), 256);
-		CHECK(tMRMBE.store_from(cb, record.custom));
+				.store_ref(account_blocks.make_opt_cell(ctx, indent + 1))
+				.append_cellslice(ccs);
+		custom.pack_opt(ctx, cb, indent + 1);
 	}
 
 	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
 		in_msg_descr.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
 		out_msg_descr.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
-
-		CHECK(
-      cs.fetch_ref_to(record.account_blocks)
-      && cs.fetch_bits_to(record.rand_seed.bits(), 256)
-      && cs.fetch_bits_to(record.created_by.bits(), 256)
-      && tMRMBE.fetch_to(cs, record.custom)
-		);
+		account_blocks.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+		ccs = cs.fetch_subslice(512).write();
+		custom.unpack_opt(ctx, cs, indent + 1);
 	}
 
 	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
 		cb.store_long(0x4a33f6fd, 32)
 				.store_ref(in_msg_descr.make_std_cell(ctx, indent + 1))
 				.store_ref(out_msg_descr.make_std_cell(ctx, indent + 1))
-				.store_ref(record.account_blocks)
-				.store_bits(record.rand_seed.cbits(), 256)
-				.store_bits(record.created_by.cbits(), 256);
-		CHECK(tMRMBE.store_from(cb, record.custom));
+				.store_ref(account_blocks.make_std_cell(ctx, indent + 1))
+				.append_cellslice(ccs);
+		custom.pack_std(ctx, cb, indent + 1);
 	}
 };
 
@@ -1893,7 +2105,7 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 	FullMERKLE_UPDATE<FullShardState> state_update;
 	FullBlockExtra extra;
 
-	FullBlock(): BaseFullCell("Block", block::gen::t_Block), state_update(FullShardState()) {
+	FullBlock(): BaseFullCell("Block"), state_update(FullShardState()) {
 
 	}
 
@@ -2038,15 +2250,19 @@ void check_decompress() {
 
 // minify-remove:end
 
-int main()
+int main(
+	// minify-remove
+	int argc, const char * argv[]
+)
 {
 	// minify-remove:start
 
 	// check_decompress();
 
-	ifstream fin("tests/1-001.txt");
-	ofstream fout_source("analysis-01-source-cells.txt");
-	ofstream fout_final("analysis-02-final-cells.txt");
+	ifstream fin(argc > 1 ? argv[1] : "tests/1-001.txt");
+	// ifstream fin(argc > 1 ? argv[1] : "tests/1-006.txt");
+	ofstream fout_source_cells("analysis-01-source-cells.txt");
+	ofstream fout_final_cells("analysis-02-final-cells.txt");
 	ofstream fout_parse_std("analysis-03-parse-std.txt");
 	ofstream fout_pack_opt("analysis-04-pack-opt.txt");
 	ofstream fout_parse_opt("analysis-05-parse-opt.txt");
@@ -2077,11 +2293,33 @@ int main()
 	CHECK(std_boc.import_cells().is_ok());
 	cout << "Cells count: " << std_boc.cell_count << endl;
 
-	for (const auto& cell: std_boc.cell_list_) {
-		auto hex = cell.dc_ref->to_hex();
-		transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+	{
+		int max_backrefs = 0;
+		std::vector<int> backrefs(std_boc.cell_list_.size(), 0);
+		for (const auto& cell: std_boc.cell_list_) {
+			for (int j = 0; j < cell.ref_num; ++j) {
+				backrefs[cell.ref_idx[j]] += 1;
+				max_backrefs = std::max(backrefs[cell.ref_idx[j]], max_backrefs);
+			}
+		}
 
-		fout_source << hex.substr(0, 2) << " " << hex.substr(2, 2) << " " << hex.substr(4) << endl;
+		for (int i = 0; i < std_boc.cell_list_.size(); ++i) {
+			const auto& cell = std_boc.cell_list_.at(i);
+			auto hex = cell.dc_ref->to_hex();
+			transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+
+			fout_source_cells << std::setw(std::ceil(std::log10(max_backrefs)) + 1) << backrefs[i] << " : " 
+												<< hex.substr(0, 2) << " " 
+												<< hex.substr(2, 2) << " " 
+												<< hex.substr(4);
+			if (cell.ref_num > 0) {
+				fout_source_cells << " (";
+				for (int j = 0; j < cell.ref_num; ++j) {
+					fout_source_cells << cell.ref_idx.at(j) << (((j + 1) == cell.ref_num) ? ")" : ", ");
+				}
+			}
+			fout_source_cells << endl;
+		}
 	}
 
 	cout << "\n\nEnabled optimizations: " << enabled_optimizations.size() << endl; 
@@ -2136,11 +2374,33 @@ int main()
 	CHECK(un_opt_boc.import_cells().is_ok());
 	print_delta("Un-optimized block cells count", un_opt_boc.cell_count, std_boc.cell_count);
 
-	for (const auto& cell: un_opt_boc.cell_list_) {
-		auto hex = cell.dc_ref->to_hex();
-		transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+	{
+		int max_backrefs = 0;
+		std::vector<int> backrefs(un_opt_boc.cell_list_.size(), 0);
+		for (const auto& cell: un_opt_boc.cell_list_) {
+			for (int j = 0; j < cell.ref_num; ++j) {
+				backrefs[cell.ref_idx[j]] += 1;
+				max_backrefs = std::max(backrefs[cell.ref_idx[j]], max_backrefs);
+			}
+		}
 
-		fout_final << hex.substr(0, 2) << " " << hex.substr(2, 2) << " " << hex.substr(4) << endl;
+		for (int i = 0; i < un_opt_boc.cell_list_.size(); ++i) {
+			const auto& cell = un_opt_boc.cell_list_.at(i);
+			auto hex = cell.dc_ref->to_hex();
+			transform(hex.begin(), hex.end(), hex.begin(), ::toupper);
+
+			fout_final_cells << std::setw(std::ceil(std::log10(max_backrefs)) + 1) << backrefs[i] << " : " 
+												<< hex.substr(0, 2) << " " 
+												<< hex.substr(2, 2) << " " 
+												<< hex.substr(4);
+			if (cell.ref_num > 0) {
+				fout_final_cells << " (";
+				for (int j = 0; j < cell.ref_num; ++j) {
+					fout_final_cells << cell.ref_idx.at(j) << (((j + 1) == cell.ref_num) ? ")" : ", ");
+				}
+			}
+			fout_final_cells << endl;
+		}
 	}
 
 	auto un_opt_bin = vm::std_boc_serialize(un_opt_block_cell, 31).move_as_ok();

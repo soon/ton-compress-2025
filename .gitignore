@@ -6,4 +6,5 @@
 /.tmp
 /untitled folder
 /*.out.*/
+/*.out
 /executable
