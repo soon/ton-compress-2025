@@ -1,7 +1,7 @@
 // minify-remove:start
-#define private public
 #define FIXED_FLOAT(x) fixed <<setprecision(2)<<(x)
 // minify-remove:end
+#define private public
 #define final
 
 #include <iostream>
@@ -17,6 +17,7 @@
 #include "td/utils/misc.h"
 #include "td/utils/buffer.h"
 #include "td/utils/misc.h"
+#include "crypto/vm/boc-writers.h"
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -2179,7 +2180,258 @@ public:
     NullStream() : ostream( &m_nb ) {}
 };
 
+// #include "zpaq_impl_2.cpp"
 #include "zpaq_impl.cpp"
+
+
+td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
+	CHECK(!cell.is_null());
+  BagOfCells boc;
+  boc.add_root(cell);
+  CHECK(boc.import_cells().is_ok());
+	auto size = boc.estimate_serialized_size(0);
+	td::BufferSlice bs{size};
+	auto buffer = (unsigned char*)bs.data();
+
+	boc_writers::BufferWriter writer{buffer, buffer + size};
+
+	// calc backrefs to the cell
+	std::vector<int> backrefs(boc.cell_list_.size(), 0);
+	for (int i = 0; i < boc.cell_count; ++i) {
+    const auto& cell = boc.cell_list_[i];
+		for (int j = 0; j < cell.ref_num; ++j) {
+			backrefs[cell.ref_idx[j]] += 1;
+		}
+  }
+
+	auto last_print = writer.store_ptr;
+	auto print_writer = [&](string label) {
+		if (last_print < writer.store_ptr) {
+			out << label << ": " << td::ConstBitPtr{last_print}.to_hex((writer.store_ptr - last_print) * 8) << endl;
+			last_print = writer.store_ptr;
+		}
+	};
+
+	auto store_byte = [&](unsigned long long value) { writer.store_uint(value, 1); };
+	auto store_ref = [&](unsigned long long value) { writer.store_uint(value, boc.info.ref_byte_size); };
+	auto overwrite_ref = [&](int position, unsigned long long value) { 
+		auto ptr = writer.store_ptr;
+		writer.store_ptr = writer.store_start + position;
+		store_ref(value);
+		writer.store_ptr = ptr;
+	};
+
+	store_byte(boc.info.ref_byte_size);
+	print_writer("ref-size");
+
+  store_ref(0); // cells count, will overwrite later
+	print_writer("cell-num");
+
+	vector<int> idx_to_ref(boc.cell_list_.size(), -1);
+	vector<pair<int, size_t>> refs_to_set;
+
+	std::function<void(int, const vm::BagOfCells::CellInfo&)> store_cell;
+	store_cell = [&](int idx, const vm::BagOfCells::CellInfo& dc_info) { 
+		unsigned char buf[256] = {};
+    const Ref<DataCell>& dc = dc_info.dc_ref;
+
+		// calc mask, 1 means ref is embedded, 0 means stored as a separate cell
+		int mask = 0;
+		for (unsigned j = 0; j < dc_info.ref_num; ++j) {
+			int ref_idx = dc_info.ref_idx[j];
+			int br = backrefs.at(ref_idx);
+			if (br == 1) {
+				mask |= (1 << j);
+			}
+		}
+
+		int s = dc->serialize(buf, 256, false);
+		buf[0] = (buf[0] & 15) + mask * 16;
+    writer.store_bytes(buf, s);
+		print_writer("data");
+
+		for (unsigned j = 0; j < dc_info.ref_num; ++j) {
+			int ref_idx = dc_info.ref_idx[j];
+			int br = backrefs.at(ref_idx);
+			CHECK(br > 0);
+			if (br == 1) {
+				// embed cell
+				store_cell(ref_idx, boc.cell_list_[ref_idx]);
+			} else {
+				// remember to set cell idx later
+				refs_to_set.emplace_back(ref_idx, writer.position());
+				store_ref(0);
+				print_writer("ref");
+			}
+    }
+	};
+
+	// store all cells with 0 (root) or >1 (many parents) backrefs
+	int cells_cnt = 0;
+  for (int i = 0; i < boc.cell_count; ++i) {
+		int k = boc.cell_count - 1 - i;
+    const auto& dc_info = boc.cell_list_[k];
+		int br = backrefs.at(k);
+
+		if (br != 1) {
+			store_cell(k, dc_info);
+			idx_to_ref[k] = cells_cnt++;
+		} 
+  }
+
+	// replace cells count
+	overwrite_ref(1, cells_cnt);
+
+	// replace ref placeholders with actual cell ids
+	for (const auto& p: refs_to_set) {
+		overwrite_ref(p.second, idx_to_ref[p.first]);
+	}
+
+	bs.truncate(writer.position());
+	return bs;
+}
+
+struct DeserializedCell {
+	bool special;
+	int bits;
+	string data;
+	vector<pair<int, int>> refs{};
+};
+
+Ref<Cell> deserialize_boc_opt(ostream& out, td::Slice data) {
+	CHECK(!data.empty());
+
+	int start = 0;
+	
+	auto last_print = 0;
+	auto print_reader = [&](string label) {
+		if (last_print < start) {
+			out << label << ": " << td::ConstBitPtr{(const unsigned char*)data.data() + last_print}.to_hex((start - last_print) * 8) << endl;
+			last_print = start;
+		}
+	};
+
+	auto read_byte = [&]() { 
+		CHECK(data.size() > start);
+		return (unsigned char)data[start++];
+	};
+	auto read_int = [&](int bytes) {
+		unsigned long long res = 0;
+		while (bytes > 0) {
+			res = (res << 8) + read_byte();
+			--bytes;
+		}
+		return res;
+	};
+	auto read_bytes = [&](int bytes) {
+		string bs(bytes, 0);
+		for (int i = 0; i < bytes; ++i) {
+			bs.at(i) = read_byte();
+		}
+		return bs;
+	};
+
+	auto ref_byte_size = (int)read_byte();
+	print_reader("ref-size");
+
+	auto read_ref = [&]() { return read_int(ref_byte_size); };
+
+	auto cell_num = read_ref();
+	print_reader("cell-num");
+	
+	vector<DeserializedCell> cells_data;
+	vector<array<pair<int, int>, 4>> cells_refs;
+	vector<int> ref_to_cd_idx(cell_num);
+
+	std::function<void(int)> read_cell;
+	read_cell = [&](int idx) { 
+		auto d1 = read_byte();
+		auto d2 = read_byte();
+
+		auto ref_num = d1 & 7;
+		auto special = (d1 & 8) > 0;
+		auto mask = (d1 >> 4) & 15;
+
+		auto bytes = (d2 + 1) >> 1;
+
+		auto data = read_bytes(bytes);
+		print_reader("data");
+		auto bits = bytes * 8;
+
+		// correct bits and last byte
+		if (data.size() > 0 && (d2 & 1)) {
+			unsigned char last_byte = data[data.size() - 1];
+			int significant = 8;
+			while (significant && (last_byte & 1) == 0) {
+				significant--;
+				last_byte >>= 1;
+			}
+			if (significant) {
+				last_byte = (last_byte & 254) << (8 - significant);
+				significant--;
+			}
+			data[data.size() - 1] = last_byte;
+			bits -= (8 - significant);
+		}
+
+		if (idx != -1) {
+			// remember top-level cell (ref) to actual cell count
+			ref_to_cd_idx.at(idx) = cells_data.size();
+		}
+		cells_data.push_back(DeserializedCell{
+				special, bits, data,
+		});
+		int dc_idx = cells_data.size() - 1;
+
+		for (int i = 0; i < ref_num; ++i) {
+			bool is_embedded = (mask >> i) & 1;
+			if (is_embedded) {
+				// preserve index of the cell about to be loaded
+				cells_data.at(dc_idx).refs.push_back({cells_data.size(), -1});
+				read_cell(-1);
+			} else {
+				// read ref instead and map it later
+				cells_data.at(dc_idx).refs.push_back({-1, read_ref()});
+				print_reader("ref");
+			}
+		}
+	};
+
+	for (int i = 0; i < cell_num; ++i) {
+		read_cell(i);
+	}
+
+	vector<Ref<Cell>> cells(cells_data.size());
+
+	for (int i = cells_data.size() - 1; i >= 0; --i) {
+		auto& cd = cells_data[i];
+		CellBuilder cb;
+		cb.store_bits(cd.data.data(), cd.bits);
+		for (const auto& ref: cd.refs) {
+			int idx = ref.first;
+			if (idx == -1) {
+				CHECK(ref.second != -1);
+				idx = ref_to_cd_idx.at(ref.second);
+			}
+			auto& cell = cells.at(idx);
+			CHECK(!cell.is_null());
+			cb.store_ref(cell);
+		}
+		cells[i] = cb.finalize(cd.special);
+	}
+
+	return std::move(cells[0]);
+}
+
+td::BufferSlice do_compress(td::Slice data) {
+	// return td::lz4_compress(data);
+	return zpaq::compress(data);
+}
+
+td::BufferSlice do_decompress(td::Slice data) {
+	// return td::lz4_decompress(data, 10'000'000).move_as_ok();
+	return zpaq::decompress(data);
+}
 
 td::BufferSlice compress(td::Slice data) {
 	NullStream ofs;
@@ -2193,14 +2445,9 @@ td::BufferSlice compress(td::Slice data) {
 	ParseContext pack_opt_ctx{ofs};
 	auto opt_block_cell = block.make_opt_cell(pack_opt_ctx);
 
-	BagOfCells opt_boc;
-	opt_boc.add_root(opt_block_cell);
-	CHECK(opt_boc.import_cells().is_ok());
-
-	auto opt_ser = std_boc_serialize(opt_block_cell).move_as_ok();
-
-	// auto compressed = td::lz4_compress(opt_ser);
-	auto compressed = zpaq::compress(opt_ser);
+	// auto opt_ser = std_boc_serialize(opt_block_cell).move_as_ok();
+	auto opt_ser = serialize_boc_opt(ofs, opt_block_cell);
+	auto compressed = do_compress(opt_ser);
 
 	return compressed;
 }
@@ -2208,9 +2455,9 @@ td::BufferSlice compress(td::Slice data) {
 td::BufferSlice decompress(td::Slice data) {
 	NullStream ofs;
 
-	// auto decompressed = td::lz4_decompress(data, 10'000'000).move_as_ok();
-	auto decompressed = zpaq::decompress(data);
-	auto opt_deser = std_boc_deserialize(decompressed, false, true).move_as_ok();
+	auto decompressed = do_decompress(data);
+	// auto opt_deser = std_boc_deserialize(decompressed, false, true).move_as_ok();
+	auto opt_deser = deserialize_boc_opt(ofs, decompressed);
 
 	FullBlock opt_block;
 	ParseContext parse_opt_ctx{ofs};
@@ -2218,10 +2465,6 @@ td::BufferSlice decompress(td::Slice data) {
 
 	ParseContext pack_std_ctx{ofs};
 	auto un_opt_block_cell = opt_block.make_std_cell(pack_std_ctx);
-
-	BagOfCells un_opt_boc;
-	un_opt_boc.add_root(un_opt_block_cell);
-	CHECK(un_opt_boc.import_cells().is_ok());
 
 	auto boc = std_boc_serialize(un_opt_block_cell, 31).move_as_ok();
 	return boc;
@@ -2268,6 +2511,8 @@ int main(
 	ofstream fout_parse_opt("analysis-05-parse-opt.txt");
 	ofstream fout_pack_std("analysis-06-pack-std.txt");
 	ofstream fout_compressed_b64("analysis-07-compressed-b64.txt");
+	ofstream fout_boc_ser("analysis-08-boc-ser.txt");
+	ofstream fout_boc_deser("analysis-09-boc-deser.txt");
 
 	string block_base64;
 	fin >> block_base64;
@@ -2341,11 +2586,26 @@ int main(
 	CHECK(opt_boc.import_cells().is_ok());
 	print_delta("Optimized block cells count", opt_boc.cell_count, std_boc.cell_count);
 
-	auto opt_ser = vm::std_boc_serialize(opt_block_cell).move_as_ok();
+	// auto opt_ser = vm::std_boc_serialize(opt_block_cell).move_as_ok();
+	auto opt_ser = serialize_boc_opt(fout_boc_ser, opt_block_cell);
 	print_delta("Optimized block size", opt_ser.size(), original_size);
 
-	auto compressed = td::lz4_compress(opt_ser);
+	if (argc > 1) {
+		auto input_path = string(argv[1]);
+		ofstream fout_opt_ser("out/" + input_path + "-opt-ser.txt");
+		CHECK(fout_opt_ser.is_open());
+		fout_opt_ser << td::str_base64_encode(opt_ser);
+	}
+
+	auto compressed = do_compress(opt_ser);
 	print_delta("Compressed size", compressed.size(), opt_ser.size());
+
+	if (argc > 1) {
+		auto input_path = string(argv[1]);
+		ofstream fout_compressed("out/" + input_path + "-compressed.txt");
+		CHECK(fout_compressed.is_open());
+		fout_compressed << td::str_base64_encode(compressed);
+	}
 
 	cout << "Total compression delta: ";
 	do_print_delta(compressed.size(), original_input_size);
@@ -2357,8 +2617,9 @@ int main(
 	fout_compressed_b64 << compressed_b64;
 
 	auto compressed_b64_decoded = td::base64_decode(compressed_b64);
-	auto decompressed = td::lz4_decompress(compressed_b64_decoded, 10'000'000).move_as_ok();
-	auto opt_deser = vm::std_boc_deserialize(decompressed, false, true).move_as_ok();
+	auto decompressed = do_decompress(compressed_b64_decoded);
+	// auto opt_deser = vm::std_boc_deserialize(decompressed, false, true).move_as_ok();
+	auto opt_deser = deserialize_boc_opt(fout_boc_deser, decompressed);
 
 	cout << "\nLoading optimized block..." << endl; 
 	FullBlock opt_block;

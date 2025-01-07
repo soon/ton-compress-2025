@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-DYLD_LIBRARY_PATH=. ./print_block.out
+DYLD_LIBRARY_PATH=. ./executable

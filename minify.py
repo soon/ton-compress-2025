@@ -181,6 +181,7 @@ def minify_cpp(source_code):
     # Remove single-line comments (//)
     source_code = re.sub(r'//.*', '', source_code)
 
+    return source_code
 
     # Remove leading and trailing whitespaces from each line
     lines = [line.strip() for line in source_code.splitlines()]
