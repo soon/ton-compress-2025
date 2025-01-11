@@ -16,70 +16,98 @@
 #define Y else
 #define O if
 #define Q for
+#define F(x) for(int i=0;i<(x);++i)
 
 using I=int;
 
+// minify-remove
 using namespace std;
 
-// #define NOJIT
-
-// #define unix
-
-// #define NDEBUG 1
 
 namespace LQ {
 
-// 1, 2, 4, 8 byte unsigned Iegers
 typedef uint8_t U8;
 typedef uint16_t U16;
 typedef uint32_t U32;
 typedef uint64_t U64;
 
-
 void E(const char* msg=0) {
-//   O (strstr(msg, "ut of memory")) throw std::bad_alloc();
   throw runtime_error(msg);
 }
 
-// Virtual base classes Q input and output
-// get() and put() must be overridden to read or write 1 byte.
-// read() and write() may be overridden to read or write n bytes more
-// efficiently than calling get() or put() n times.
+I lg(unsigned x) {
+  unsigned r=0;
+  O (x>=65536) r=16, x>>=16;
+  O (x>=256) r+=8, x>>=8;
+  O (x>=16) r+=4, x>>=4;
+  return
+    "\x00\x01\x02\x02\x03\x03\x03\x03\x04\x04\x04\x04\x04\x04\x04\x04"[x]+r;
+}
+
+I tolower(I c){return(c>='A'&&c<='Z')?c+'a'-'A':c;}
+
+string itos(int64_t x, I n=1) {
+  string r;
+  Q (; x || n>0; x/=10, --n) r=string(1, '0'+x%10)+r;
+  return r;
+}
+
 struct Reader {
   virtual I get() = 0;  // should return 0..255, or -1 at EOF
-  virtual I read(char* buf, I n); // read to buf[n], return no. read
+  virtual I read(char* buf, I n) {
+    I i=0, c;
+    while (i<n && (c=get())>=0)
+      buf[i++]=c;
+    return i;
+  }
   virtual ~Reader() {}
 };
 
 struct Writer {
-  virtual void put(I c) = 0;  // should output low 8 bits of c
-  virtual void write(const char* buf, I n);  // write buf[n]
+  virtual void put(I c) = 0;
+  virtual void write(const char* buf, I n) {
+    F(n) put(U8(buf[i]));
+  }
   virtual ~Writer() {}
 };
 
-// Read 16 bit little-endian number
-I toU16(const char* p);
+I toU16(const char* p) {
+  return (p[0]&255)+256*(p[1]&255);
+}
 
-// An Array of T is cleared and aligned on a 64 byte address
-//   with no constructors called. No copy or assignment.
-// Array<T> a(n, ex=0);  - creates n<<ex elements of type T
-// a[i] - index
-// a(i) - index mod n, n must be a power of 2
-// a.size() - gets n
+const I compsize[256]={0,2,3,2,3,4,6,6,3,5};
+
 template <class T>
-class Array {
-  T *data;     // user location of [0] on a 64 byte boundary
-  size_t n;    // user size
-  I offset;  // distance back in bytes to start of actual allocation
-  void operator=(const Array&);  // no assignment
-  Array(const Array&);  // no copy
-public:
-  Array(size_t sz=0, I ex=0): data(0), n(0), offset(0) {
-    resize(sz, ex);} // [0..sz-1] = 0
-  void resize(size_t sz, I ex=0); // change size, erase content to zeros
+struct Array {
+  T *data;  
+  size_t n;  
+  I offset; 
+  void operator=(const Array&);
+  Array(const Array&); 
+  Array(size_t sz=0, I ex=0): data(0), n(0), offset(0) { resize(sz, ex); }
+  void resize(size_t sz, I ex=0) {
+    while (ex>0) {
+      O (sz>sz*2) E();
+      sz*=2, --ex;
+    }
+    O (n>0) {
+      ::free((char*)data-offset);
+    }
+    n=0;
+    offset=0;
+    O (sz==0) return;
+    n=sz;
+    const size_t nb=128+n*sizeof(T); 
+    O (nb<=128 || (nb-128)/sizeof(T)!=n) n=0, E();
+    data=(T*)::calloc(nb, 1);
+    O (!data) n=0, E(); // E("Out of memory");
+    offset=64-(((char*)data-(char*)0)&63);
+    //   assert(offset>0 && offset<=64);
+    data=(T*)((char*)data+offset);
+  } // change size, erase content to zeros
   ~Array() {resize(0);}  // free memory
-  size_t size() const {return n;}  // get size
-  I isize() const {return I(n);}  // get size as an I
+  size_t size() {return n;}  // get size
+  I isize() {return I(n);}  // get size as an I
   T& operator[](size_t i) {
     // assert(n>0 && i<n); 
     return data[i];}
@@ -88,103 +116,333 @@ public:
     return data[i&(n-1)];}
 };
 
-// Change size to sz<<ex elements of 0
-template<class T>
-void Array<T>::resize(size_t sz, I ex) {
-//   assert(size_t(-1)>0);  // unsigned type?
-  while (ex>0) {
-    O (sz>sz*2) E(); // E("Array too big");
-    sz*=2, --ex;
-  }
-  O (n>0) {
-    // assert(offset>0 && offset<=64);
-    // assert((char*)data-offset);
-    ::free((char*)data-offset);
-  }
-  n=0;
-  offset=0;
-  O (sz==0) return;
-  n=sz;
-  const size_t nb=128+n*sizeof(T);  // test Q overflow
-  O (nb<=128 || (nb-128)/sizeof(T)!=n) n=0, E(); // E("Array too big");
-  data=(T*)::calloc(nb, 1);
-  O (!data) n=0, E(); // E("Out of memory");
-  offset=64-(((char*)data-(char*)0)&63);
-//   assert(offset>0 && offset<=64);
-  data=(T*)((char*)data+offset);
-}
-
-// Symbolic constants, instruction size, and names
 typedef enum {NONE,CONS,CM,ICM,MATCH,AVG,MIX2,MIX,ISSE,SSE} CompType;
-// extern const I compsize[256];
-class Decoder;  // Qward
-
-// A ZP machine COMP+HCOMP or PCOMP.
-class ZP {
-public:
-  ZP();
-  ~ZP();
-  void clear();           // Free memory, erase program, reset machine state
-  void inith();           // Initialize as HCOMP to run
-  void initp();           // Initialize as PCOMP to run
-  double memory();        // Return memory requirement in bytes
+struct Decoder;  // Qward
+struct ZP {
+  ZP() {
+    output=0;
+    rcode=0;
+    rcode_size=0;
+    clear();
+    outbuf.resize(1<<14);
+    bufptr=0;
+  }
+  void clear() {
+    cend=hbegin=hend=0;  // COMP and HCOMP locations
+    a=b=c=d=f=pc=0;      // machine state
+    D.resize(0);
+    h.resize(0);
+    m.resize(0);
+    r.resize(0);
+  }
+  void inith() { init(D[2], D[3]); }
+  void initp() { init(D[4], D[5]); }
   void run(U32 input);    // Execute with input
-  I read(Reader* in2);  // Read D
-  bool write(Writer* out2, bool pp); // O pp write PCOMP Y HCOMP D
+  I read(Reader* in2) {
+    I hsize=in2->get();
+    hsize+=in2->get()*256;
+    D.resize(hsize+300);
+    cend=hbegin=hend=0;
+    D[cend++]=hsize&255;
+    D[cend++]=hsize>>8;
+    while (cend<7) D[cend++]=in2->get(); // hh hm ph pm n
+
+    I n=D[cend-1];
+    F(n){
+      I type=in2->get();  // component type
+      D[cend++]=type;  // component type
+      I size=compsize[type];
+      Q (I j=1; j<size; ++j)
+        D[cend++]=in2->get();
+    }
+    O ((D[cend++]=in2->get())!=0) E();
+
+    hbegin=hend=cend+128;
+    while (hend<hsize+129) {
+      I op=in2->get();
+      D[hend++]=op;
+    }
+    O ((D[hend++]=in2->get())!=0) E();
+    return cend+hend-hbegin;
+  }
+  bool write(Writer* out2, bool pp) {
+    O (D.size()<=6) return false;
+    O (!pp) {  // O not a postprocessor then write COMP
+      F(cend)out2->put(D[i]);
+    }
+    Y {  // write PCOMP size only
+      out2->put((hend-hbegin)&255);
+      out2->put((hend-hbegin)>>8);
+    }
+    Q (I i=hbegin; i<hend; ++i)
+      out2->put(D[i]);
+    return true;
+  }
   I step(U32 input, I mode);  // Trace execution (defined externally)
 
   Writer* output;         // Destination Q OUT instruction, or 0 to suppress
-//   SHA1* sha1;             // PoIs to checksum computer
   U32 H(I i) {return h(i);}  // get element of h
 
-  void flush();           // write outbuf[0..bufptr-1] to output and sha1
+  void flush() {
+    O (output) output->write(&outbuf[0], bufptr);
+    bufptr=0;
+  }
   void outc(I ch) {     // output byte ch (0..255) or -1 at EOS
     O (ch<0 || (outbuf[bufptr]=ch, ++bufptr==outbuf.isize())) flush();
   }
 
-  // ZPAQ1 block D
   Array<U8> D;   // hsize[2] hh hm ph pm n COMP (guard) HCOMP (guard)
-  I cend;           // COMP in D[7...cend-1]
-  I hbegin, hend;   // HCOMP/PCOMP in D[hbegin...hend-1]
+  I cend, hbegin, hend;   // HCOMP/PCOMP in D[hbegin...hend-1]
 
-private:
-  // Machine state Q executing HCOMP
   Array<U8> m;        // memory array M Q HCOMP
   Array<U32> h, r;       // hash array H Q HCOMP
-//   Array<U32> r;       // 256 element register array
   Array<char> outbuf; // output buffer
   I bufptr;         // number of bytes in outbuf
   U32 a, b, c, d;     // machine registers
   I f, pc, rcode_size;              // condition flag
-//   I pc;             // program counter
-//   I rcode_size;     // length of rcode
   U8* rcode;          // JIT code Q run()
 
-  // Support code
-  void init(I hbits, I mbits);  // initialize H and M sizes
-  I execute();  // Ierpret 1 instruction, return 0 after HALT, Y 1
-//   void run0(U32 input);  // default run() O not JIT
+  void init(I hbits, I mbits) {
+    h.resize(1, hbits);
+    m.resize(1, mbits);
+    r.resize(256);
+    a=b=c=d=pc=f=0;
+  }
+  
+  I execute() {
+    switch(D[pc++]) {
+      // case 0:err(); break; // E
+      case 1:++a; break; // A++
+      case 2:--a; break; // A--
+      case 3:a = ~a; break; // A!
+      case 4:a = 0; break; // A=0
+      case 7:a = r[D[pc++]]; break; // A=R N
+      case 8:swap(b); break; // B<>A
+      case 9:++b; break; // B++
+      case 10:--b; break; // B--
+      case 11:b = ~b; break; // B!
+      case 12:b = 0; break; // B=0
+      case 15:b = r[D[pc++]]; break; // B=R N
+      case 16:swap(c); break; // C<>A
+      case 17:++c; break; // C++
+      case 18:--c; break; // C--
+      case 19:c = ~c; break; // C!
+      case 20:c = 0; break; // C=0
+      case 23:c = r[D[pc++]]; break; // C=R N
+      case 24:swap(d); break; // D<>A
+      case 25:++d; break; // D++
+      case 26:--d; break; // D--
+      case 27:d = ~d; break; // D!
+      case 28:d = 0; break; // D=0
+      case 31:d = r[D[pc++]]; break; // D=R N
+      case 32:swap(m(b)); break; // *B<>A
+      case 33:++m(b); break; // *B++
+      case 34:--m(b); break; // *B--
+      case 35:m(b) = ~m(b); break; // *B!
+      case 36:m(b) = 0; break; // *B=0
+      case 39:O (f) pc+=((D[pc]+128)&255)-127; Y ++pc; break; // JT N
+      case 40:swap(m(c)); break; // *C<>A
+      case 41:++m(c); break; // *C++
+      case 42:--m(c); break; // *C--
+      case 43:m(c) = ~m(c); break; // *C!
+      case 44:m(c) = 0; break; // *C=0
+      case 47:O (!f) pc+=((D[pc]+128)&255)-127; Y ++pc; break; // JF N
+      case 48:swap(h(d)); break; // *D<>A
+      case 49:++h(d); break; // *D++
+      case 50:--h(d); break; // *D--
+      case 51:h(d) = ~h(d); break; // *D!
+      case 52:h(d) = 0; break; // *D=0
+      case 55:r[D[pc++]] = a; break; // R=A N
+      case 56:return 0  ; // HALT
+      case 57:outc(a&255); break; // OUT
+      case 59:a = (a+m(b)+512)*773; break; // HASH
+      case 60:h(d) = (h(d)+a+512)*773; break; // HASHD
+      case 63:pc+=((D[pc]+128)&255)-127; break; // JMP N
+      case 64:break; // A=A
+      case 65:a = b; break; // A=B
+      case 66:a = c; break; // A=C
+      case 67:a = d; break; // A=D
+      case 68:a = m(b); break; // A=*B
+      case 69:a = m(c); break; // A=*C
+      case 70:a = h(d); break; // A=*D
+      case 71:a = D[pc++]; break; // A= N
+      case 72:b = a; break; // B=A
+      case 73:break; // B=B
+      case 74:b=c; break; // B=C
+      case 75:b=d; break; // B=D
+      case 76:b=m(b); break; // B=*B
+      case 77:b=m(c); break; // B=*C
+      case 78:b=h(d); break; // B=*D
+      case 79:b=D[pc++]; break; // B= N
+      case 80:c=a; break; // C=A
+      case 81:c=b; break; // C=B
+      case 82:break; // C=C
+      case 83:c=d; break; // C=D
+      case 84:c=m(b); break; // C=*B
+      case 85:c=m(c); break; // C=*C
+      case 86:c=h(d); break; // C=*D
+      case 87:c=D[pc++]; break; // C= N
+      case 88:d=a; break; // D=A
+      case 89:d=b; break; // D=B
+      case 90:d=c; break; // D=C
+      case 91:break; // D=D
+      case 92:d=m(b); break; // D=*B
+      case 93:d=m(c); break; // D=*C
+      case 94:d=h(d); break; // D=*D
+      case 95:d=D[pc++]; break; // D= N
+      case 96:m(b)=a; break; // *B=A
+      case 97:m(b)=b; break; // *B=B
+      case 98:m(b)=c; break; // *B=C
+      case 99:m(b)=d; break; // *B=D
+      case 100:break; // *B=*B
+      case 101:m(b)=m(c); break; // *B=*C
+      case 102:m(b)=h(d); break; // *B=*D
+      case 103:m(b)=D[pc++]; break; // *B= N
+      case 104:m(c)=a; break; // *C=A
+      case 105:m(c)=b; break; // *C=B
+      case 106:m(c)=c; break; // *C=C
+      case 107:m(c)=d; break; // *C=D
+      case 108:m(c)=m(b); break; // *C=*B
+      case 109:break; // *C=*C
+      case 110:m(c)=h(d); break; // *C=*D
+      case 111:m(c)=D[pc++]; break; // *C= N
+      case 112:h(d)=a; break; // *D=A
+      case 113:h(d)=b; break; // *D=B
+      case 114:h(d)=c; break; // *D=C
+      case 115:h(d)=d; break; // *D=D
+      case 116:h(d)=m(b); break; // *D=*B
+      case 117:h(d)=m(c); break; // *D=*C
+      case 118:break; // *D=*D
+      case 119:h(d)=D[pc++]; break; // *D= N
+      case 128:a+=a; break; // A+=A
+      case 129:a+=b; break; // A+=B
+      case 130:a+=c; break; // A+=C
+      case 131:a+=d; break; // A+=D
+      case 132:a+=m(b); break; // A+=*B
+      case 133:a+=m(c); break; // A+=*C
+      case 134:a+=h(d); break; // A+=*D
+      case 135:a+=D[pc++]; break; // A+= N
+      case 136:a-=a; break; // A-=A
+      case 137:a-=b; break; // A-=B
+      case 138:a-=c; break; // A-=C
+      case 139:a-=d; break; // A-=D
+      case 140:a-=m(b); break; // A-=*B
+      case 141:a-=m(c); break; // A-=*C
+      case 142:a-=h(d); break; // A-=*D
+      case 143:a-=D[pc++]; break; // A-= N
+      case 144:a*=a; break; // A*=A
+      case 145:a*=b; break; // A*=B
+      case 146:a*=c; break; // A*=C
+      case 147:a*=d; break; // A*=D
+      case 148:a*=m(b); break; // A*=*B
+      case 149:a*=m(c); break; // A*=*C
+      case 150:a*=h(d); break; // A*=*D
+      case 151:a*=D[pc++]; break; // A*= N
+      case 152:div(a); break; // A/=A
+      case 153:div(b); break; // A/=B
+      case 154:div(c); break; // A/=C
+      case 155:div(d); break; // A/=D
+      case 156:div(m(b)); break; // A/=*B
+      case 157:div(m(c)); break; // A/=*C
+      case 158:div(h(d)); break; // A/=*D
+      case 159:div(D[pc++]); break; // A/= N
+      case 160:mod(a); break; // A%=A
+      case 161:mod(b); break; // A%=B
+      case 162:mod(c); break; // A%=C
+      case 163:mod(d); break; // A%=D
+      case 164:mod(m(b)); break; // A%=*B
+      case 165:mod(m(c)); break; // A%=*C
+      case 166:mod(h(d)); break; // A%=*D
+      case 167:mod(D[pc++]); break; // A%= N
+      case 168:a&=a; break; // A&=A
+      case 169:a&=b; break; // A&=B
+      case 170:a&=c; break; // A&=C
+      case 171:a&=d; break; // A&=D
+      case 172:a&=m(b); break; // A&=*B
+      case 173:a&=m(c); break; // A&=*C
+      case 174:a&=h(d); break; // A&=*D
+      case 175:a&=D[pc++]; break; // A&= N
+      case 176:a&=~a; break; // A&~A
+      case 177:a&=~b; break; // A&~B
+      case 178:a&=~c; break; // A&~C
+      case 179:a&=~d; break; // A&~D
+      case 180:a&=~m(b); break; // A&~*B
+      case 181:a&=~m(c); break; // A&~*C
+      case 182:a&=~h(d); break; // A&~*D
+      case 183:a&=~D[pc++]; break; // A&~ N
+      case 184:a|=a; break; // A|=A
+      case 185:a|=b; break; // A|=B
+      case 186:a|=c; break; // A|=C
+      case 187:a|=d; break; // A|=D
+      case 188:a|=m(b); break; // A|=*B
+      case 189:a|=m(c); break; // A|=*C
+      case 190:a|=h(d); break; // A|=*D
+      case 191:a|=D[pc++]; break; // A|= N
+      case 192:a^=a; break; // A^=A
+      case 193:a^=b; break; // A^=B
+      case 194:a^=c; break; // A^=C
+      case 195:a^=d; break; // A^=D
+      case 196:a^=m(b); break; // A^=*B
+      case 197:a^=m(c); break; // A^=*C
+      case 198:a^=h(d); break; // A^=*D
+      case 199:a^=D[pc++]; break; // A^= N
+      case 200:a<<=(a&31); break; // A<<=A
+      case 201:a<<=(b&31); break; // A<<=B
+      case 202:a<<=(c&31); break; // A<<=C
+      case 203:a<<=(d&31); break; // A<<=D
+      case 204:a<<=(m(b)&31); break; // A<<=*B
+      case 205:a<<=(m(c)&31); break; // A<<=*C
+      case 206:a<<=(h(d)&31); break; // A<<=*D
+      case 207:a<<=(D[pc++]&31); break; // A<<= N
+      case 208:a>>=(a&31); break; // A>>=A
+      case 209:a>>=(b&31); break; // A>>=B
+      case 210:a>>=(c&31); break; // A>>=C
+      case 211:a>>=(d&31); break; // A>>=D
+      case 212:a>>=(m(b)&31); break; // A>>=*B
+      case 213:a>>=(m(c)&31); break; // A>>=*C
+      case 214:a>>=(h(d)&31); break; // A>>=*D
+      case 215:a>>=(D[pc++]&31); break; // A>>= N
+      case 216:f=1; break; // A==A
+      case 217:f=(a==b); break; // A==B
+      case 218:f=(a==c); break; // A==C
+      case 219:f=(a==d); break; // A==D
+      case 220:f=(a==U32(m(b))); break; // A==*B
+      case 221:f=(a==U32(m(c))); break; // A==*C
+      case 222:f=(a==h(d)); break; // A==*D
+      case 223:f=(a==U32(D[pc++])); break; // A== N
+      case 224:f=0;break; // A<A
+      case 225:f=(a<b); break; // A<B
+      case 226:f=(a<c); break; // A<C
+      case 227:f=(a<d); break; // A<D
+      case 228:f=(a<U32(m(b))); break; // A<*B
+      case 229:f=(a<U32(m(c))); break; // A<*C
+      case 230:f=(a<h(d)); break; // A<*D
+      case 231:f=(a<U32(D[pc++])); break; // A< N
+      case 232:f=0;break; // A>A
+      case 233:f=(a>b); break; // A>B
+      case 234:f=(a>c); break; // A>C
+      case 235:f=(a>d); break; // A>D
+      case 236:f=(a>U32(m(b))); break; // A>*B
+      case 237:f=(a>U32(m(c))); break; // A>*C
+      case 238:f=(a>h(d)); break; // A>*D
+      case 239:f=(a>U32(D[pc++])); break; // A> N
+      case 255:O((pc=hbegin+D[pc]+256*D[pc+1])>=hend)E();break;//LJ
+      default: E();
+    }
+    return 1;
+  }
   void div(U32 x) {O (x) a/=x; Y a=0;}
   void mod(U32 x) {O (x) a%=x; Y a=0;}
   void swap(U32& x) {a^=x; x^=a; a^=x;}
   void swap(U8& x)  {a^=x; x^=a; a^=x;}
-  void err() { E("ZP execution E");}
 };
 
-///////////////////////// Component //////////////////////////
-
-// A Component is a context model, indirect context model, match model,
-// fixed weight mixer, adaptive 2 input mixer without or with current
-// partial byte as context, adaptive m input mixer (without or with),
-// or SSE (without or with).
 
 struct Component {
-  size_t z;   // max count Q cm
-  size_t cxt;     // saved context
-  size_t a, b, c; // multi-purpose variables
-  Array<U32> cm;  // cm[cxt] -> p in bits 31..10, n in 9..0; MATCH index
-  Array<U8> ht;   // ICM/ISSE hash table[0..size1][0..15] and MATCH buf
-  Array<U16> a16; // MIX weights
+  size_t z, cxt, a, b, c; 
+  Array<U32> cm;
+  Array<U8> ht;
+  Array<U16> a16;
   void init() {
     z=cxt=a=b=c=0;
     cm.resize(0);
@@ -194,466 +452,7 @@ struct Component {
   Component() {init();}
 };
 
-////////////////////////// StateTable ////////////////////////
-
-// Next state table
-class StateTable {
-public:
-  U8 ns[1024]; // state*4 -> next state O 0, O 1, n0, n1
-  I next(I s, I y) {  // next state Q bit y
-    // assert(state>=0 && state<256);
-    // assert(y>=0 && y<4);
-    return ns[s*4+y];
-  }
-  I cminit(I s) {  // initial probability of 1 * 2^23
-    // assert(state>=0 && state<256);
-    return ((ns[s*4+3]*2+1)<<22)/(ns[s*4+2]+ns[s*4+3]+1);
-  }
-  StateTable();
-};
-
-///////////////////////// P //////////////////////////
-
-// A P guesses the next bit
-class P {
-public:
-  P(ZP&);
-  ~P();
-  void init();          // build model
-  I predict();        // probability that next bit is a 1 (0..4095)
-  void update(I y);   // train on bit y (0..1)
-  I stat(I);        // Defined externally
-  bool isModeled() {    // n>0 components?
-    // assert(z.D.isize()>6);
-    return z.D[6]!=0;
-  }
-private:
-
-  // P state
-  I c8;               // L 0...7 bits.
-  I hmap4;            // c8 split Io nibbles
-  I p[256];           // predictions
-  U32 h[256];           // unrolled copy of z.h
-  ZP& z;             // VM to compute context hashes, includes H, n
-  Component comp[256];  // the model, includes P
-  bool initTables;      // are tables initialized?
-
-  // Modeling support functions
-  I predict0();       // default
-  void update0(I y);  // default
-  I dt2k[256];        // division table Q match: dt2k[i] = 2^12/i
-  I dt[1024];         // division table Q cm: dt[i] = 2^16/(i+1.5)
-  U16 squasht[4096];    // squash() lookup table
-  short stretcht[32768];// stretch() lookup table
-  StateTable st;        // next, cminit functions
-  U8* pcode;            // JIT code Q predict() and update()
-  I pcode_size;       // length of pcode
-
-  // reduce prediction E in cr.cm
-  void train(Component& cr, I y) {
-    // assert(y==0 || y==1);
-    U32& pn=cr.cm(cr.cxt);
-    U32 count=pn&0x3ff;
-    I E=y*32767-(cr.cm(cr.cxt)>>17);
-    pn+=(E*dt[count]&-1024)+(count<cr.z);
-  }
-
-  // x -> floor(32768/(1+exp(-x/64)))
-  I squash(I x) {
-    // assert(initTables);
-    // assert(x>=-2048 && x<=2047);
-    return squasht[x+2048];
-  }
-
-  // x -> round(64*log((x+0.5)/(32767.5-x))), approx inverse of squash
-  I stretch(I x) {
-    // assert(initTables);
-    // assert(x>=0 && x<=32767);
-    return stretcht[x];
-  }
-
-  // bound x to a 12 bit signed I
-  I clamp2k(I x) {
-    O (x<-2048) return -2048;
-    Y O (x>2047) return 2047;
-    Y return x;
-  }
-
-  // bound x to a 20 bit signed I
-  I clamp512k(I x) {
-    O (x<-(1<<19)) return -(1<<19);
-    Y O (x>=(1<<19)) return (1<<19)-1;
-    Y return x;
-  }
-
-  // Get cxt in ht, creating a new row O needed
-//   size_t find(Array<U8>& ht, I sizebits, U32 cxt);
-
-// Find cxt row in hash table ht. ht has rows of 16 indexed by the
-// low sizebits of cxt with element 0 having the next higher 8 bits Q
-// collision detection. O not found after 3 adjacent tries, replace the
-// row with lowest element 1 as priority. Return index of row.
-  size_t find(Array<U8>& ht, I sizebits, U32 cxt) {
-    I chk=cxt>>sizebits&255;
-    size_t h0=(cxt*16)&(ht.size()-16);
-    O (ht[h0]==chk) return h0;
-    size_t h1=h0^16;
-    O (ht[h1]==chk) return h1;
-    size_t h2=h0^32;
-    O (ht[h2]==chk) return h2;
-    O (ht[h0+1]<=ht[h1+1] && ht[h0+1]<=ht[h2+1])
-        return memset(&ht[h0], 0, 16), ht[h0]=chk, h0;
-    Y O (ht[h1+1]<ht[h2+1])
-        return memset(&ht[h1], 0, 16), ht[h1]=chk, h1;
-    Y
-        return memset(&ht[h2], 0, 16), ht[h2]=chk, h2;
-    }
-
-
-  // Put JIT code in pcode
-  I assemble_p();
-};
-
-//////////////////////////// Decoder /////////////////////////
-
-// Decoder decompresses using an arithmetic code
-class Decoder: public Reader {
-public:
-  Reader* in;        // destination
-  Decoder(ZP& z);
-  I decompress();  // return a byte or EOF
-  I skip();        // skip to the end of the segment, return next byte
-  void init();       // initialize at start of block
-  I stat(I x) {return pr.stat(x);}
-  I get() {        // return 1 byte of buffered input or EOF
-    O (rpos==wpos) {
-      rpos=0;
-      wpos=in ? in->read(&buf[0], BUFSIZE) : 0;
-    //   assert(wpos<=BUFSIZE);
-    }
-    return rpos<wpos ? U8(buf[rpos++]) : -1;
-  }
-  I buffered() {return wpos-rpos;}  // how far read ahead?
-private:
-  U32 low, high;     // range
-  U32 curr;          // L 4 bytes of archive or remaining bytes in subblock
-  U32 rpos, wpos;    // read, write position in buf
-  P pr;      // to get p
-  enum {BUFSIZE=1<<16};
-  Array<char> buf;   // input buffer of size BUFSIZE bytes
-  I decode(I p); // return decoded bit (0..1) with prob. p (0..65535)
-};
-
-/////////////////////////// PostProcessor ////////////////////
-
-class PostProcessor {
-  I state;   // input parse state: 0=INIT, 1=PASS, 2..4=loading, 5=POST
-  I hsize;   // D size
-  I ph, pm;  // sizes of H and M in z
-public:
-  ZP z;     // holds PCOMP
-  PostProcessor(): state(0), hsize(0), ph(0), pm(0) {}
-  void init(I h, I m);  // ph, pm sizes of H and M
-  I write(I c);  // Input a byte, return state
-  I getState() const {return state;}
-  void setOutput(Writer* out) {z.output=out;}
-//   void setSHA1(SHA1* sha1ptr) {z.sha1=sha1ptr;}
-};
-
-//////////////////////// D ////////////////////////
-
-// Q decompression and listing archive contents
-class D {
-public:
-  D(): z(), dec(z), pp(), state(BLOCK), decode_state(FIRSTSEG) {}
-  void setInput(Reader* in) {dec.in=in;}
-  bool findBlock(double* memptr = 0);
-//   void hcomp(Writer* out2) {z.write(out2, false);}
-  bool findFilename(Writer* = 0);
-  void readComment(Writer* = 0);
-  void setOutput(Writer* out) {pp.setOutput(out);}
-//   void setSHA1(SHA1* sha1ptr) {pp.setSHA1(sha1ptr);}
-  bool decompress(I n = -1);  // n bytes, -1=all, return true until done
-//   bool pcomp(Writer* out2) {return pp.z.write(out2, true);}
-  void readSegmentEnd(char* sha1string = 0);
-  I stat(I x) {return dec.stat(x);}
-  I buffered() {return dec.buffered();}
-private:
-  ZP z;
-  Decoder dec;
-  PostProcessor pp;
-  enum {BLOCK, FILENAME, COMMENT, DATA, SEGEND} state;  // expected next
-  enum {FIRSTSEG, SEG, SKIP} decode_state;  // which segment in block?
-};
-
-/////////////////////////// decompress() /////////////////////
-
-void decompress(Reader* in, Writer* out);
-
-//////////////////////////// Encoder /////////////////////////
-
-// Encoder compresses using an arithmetic code
-class Encoder {
-public:
-  Encoder(ZP& z, I size=0):
-    out(0), low(1), high(0xFFFFFFFF), pr(z) {}
-  void init();
-  void compress(I c);  // c is 0..255 or EOF
-  I stat(I x) {return pr.stat(x);}
-  Writer* out;  // destination
-private:
-  U32 low, high; // range
-  P pr;  // to get p
-  Array<char> buf; // unmodeled input
-  void encode(I y, I p); // encode bit y (0..1) with prob. p (0..65535)
-};
-
-//////////////////////////// Compiler ////////////////////////
-
-// Input ZP source code with args and store the compiled code
-// in hz and pz and write pcomp_cmd to out2.
-
-class Compiler {
-public:
-  Compiler(const char* in, I* args, ZP& hz, ZP& pz, Writer* out2);
-private:
-  const char* in;  // ZP source code
-  I* args;       // Array of up to 9 args, default NULL = all 0
-  ZP& hz;       // Output of COMP and HCOMP sections
-  ZP& pz;       // Output of PCOMP section
-  Writer* out2;    // Output ... of "PCOMP ... ;"
-  I line;        // Input line number Q reporting Es
-  I state;       // parse state: 0=space -1=word >0 (nest level)
-
-  // Symbolic constants
-  typedef enum {NONE,CONS,CM,ICM,MATCH,AVG,MIX2,MIX,ISSE,SSE,
-    JT=39,JF=47,JMP=63,LJ=255,
-    POST=256,PCOMP,END,IF,IFNOT,ELSE,ENDIF,DO,
-    WHILE,UNTIL,QEVER,IFL,IFNOTL,ELSEL,SEMICOLON} CompType;
-
-  void SE(const char* msg, const char* expected=0); // E()
-  void next();                     // advance in to next token
-  bool matchToken(const char* tok);// in==token?
-  I rtoken(I low, I high);   // return token which must be in range
-  I rtoken(const char* list[]);  // return token by position in list
-  void rtoken(const char* s);      // return token which must be s
-  I compile_comp(ZP& z);      // compile either HCOMP or PCOMP
-
-  // Stack of n elements
-  class Stack {
-    LQ::Array<U16> s;
-    size_t top;
-  public:
-    Stack(I n): s(n), top(0) {}
-    void push(const U16& x) {
-      O (top>=s.size()) E();// E("O or DO nested too deep");
-      s[top++]=x;
-    }
-    U16 pop() {
-      O (top<=0) E();// E("unmatched O or DO");
-      return s[--top];
-    }
-  };
-
-  Stack if_stack, do_stack;
-};
-
-//////////////////////// C //////////////////////////
-
-class C {
-public:
-  C(): enc(z), in(0), state(INIT)/*, verify(false)*/ {}
-  void setOutput(Writer* out) {enc.out=out;}
-//   void writeTag();
-  void startBlock(const char* config,     // ZP source code
-                  I* args,              // NULL or I[9] arguments
-                  Writer* pcomp_cmd = 0); // retrieve preprocessor command
-  void startSegment(const char* filename = 0, const char* comment = 0);
-  void setInput(Reader* i) {in=i;}
-  void postProcess(const char* pcomp = 0, I len = 0);  // byte code
-  bool compress(I n = -1);  // n bytes, -1=all, return true until done
-  void endSegment(const char* sha1string = 0);
-//   void endBlock();
-  I stat(I x) {return enc.stat(x);}
-private:
-  ZP z, pz;  // model and test postprocessor
-  Encoder enc;  // arithmetic encoder containing P
-  Reader* in;   // input source
-//   SHA1 sha1;    // to test pz output
-//   char sha1result[20];  // sha1 output
-  enum {INIT, BLOCK1, SEG1, BLOCK2, SEG2} state;
-//   bool verify;  // O true then test by postprocessing
-};
-
-/////////////////////////// SB /////////////////////
-
-// Q (de)compressing to/from a string. Writing appends bytes
-// which can be later read.
-class SB: public LQ::Reader, public LQ::Writer {
-  unsigned char* p;  // allocated memory, not NUL terminated, may be NULL
-  size_t al;         // number of bytes allocated, 0 iff p is NULL
-  size_t wpos;       // index of next byte to write, wpos <= al
-  size_t rpos;       // index of next byte to read, rpos < wpos or return EOF.
-  size_t limit;      // max size, default = -1
-  const size_t init; // initial size on F use after reset
-
-  // Increase capacity to a without changing size
-  void reserve(size_t a) {
-    // assert(!al==!p);
-    O (a<=al) return;
-    unsigned char* q=0;
-    O (a>0) q=(unsigned char*)(p ? realloc(p, a) : malloc(a));
-    O (a>0 && !q) E(); // E("Out of memory");
-    p=q;
-    al=a;
-  }
-
-  // Enlarge al to make room to write at least n bytes.
-  void lengthen(size_t n) {
-    // assert(wpos<=al);
-    O (wpos+n>limit || wpos+n<wpos) E("SB overflow");
-    O (wpos+n<=al) return;
-    size_t a=al;
-    while (wpos+n>=a) a=a*2+init;
-    reserve(a);
-  }
-
-  // No assignment or copy
-  void operator=(const SB&);
-  SB(const SB&);
-
-public:
-
-  // Direct access to data
-  unsigned char* data() {
-    // assert(p || wpos==0); 
-    return p;}
-
-  // Allocate no memory initially
-  SB(size_t n=0):
-      p(0), al(0), wpos(0), rpos(0), limit(size_t(-1)), init(n>128?n:128) {}
-
-  // Free memory
-  ~SB() {O (p) free(p);}
-
-  // Return number of bytes written.
-  size_t size() const {return wpos;}
-
-  // Write a single byte.
-  void put(I c) {  // write 1 byte
-    lengthen(1);
-    // assert(p);
-    // assert(wpos<al);
-    p[wpos++]=c;
-    // assert(wpos<=al);
-  }
-
-  // Write buf[0..n-1]. O buf is NULL then advance write poIer only.
-  void write(const char* buf, I n) {
-    O (n<1) return;
-    lengthen(n);
-    // assert(p);
-    // assert(wpos+n<=al);
-    O (buf) memcpy(p+wpos, buf, n);
-    wpos+=n;
-  }
-
-  // Read a single byte. Return EOF (-1) at end.
-  I get() {
-    // assert(rpos<=wpos);
-    // assert(rpos==wpos || p);
-    return rpos<wpos ? p[rpos++] : -1;
-  }
-
-  // Read up to n bytes Io buf[0..] or fewer O EOF is F.
-  // Return the number of bytes actually read.
-  // O buf is NULL then advance read poIer without reading.
-  I read(char* buf, I n) {
-    // assert(rpos<=wpos);
-    // assert(wpos<=al);
-    // assert(!al==!p);
-    O (rpos+n>wpos) n=wpos-rpos;
-    O (n>0 && buf) memcpy(buf, p+rpos, n);
-    rpos+=n;
-    return n;
-  }
-
-  // Return the entire string as a read-only array.
-  const char* c_str() const {return (const char*)p;}
-
-  // Truncate the string to size i.
-  void resize(size_t i) {
-    wpos=i;
-    O (rpos>wpos) rpos=wpos;
-  }
-
-  // Swap efficiently (init is not swapped)
-  void swap(SB& s) {
-    ::swap(p, s.p);
-    ::swap(al, s.al);
-    ::swap(wpos, s.wpos);
-    ::swap(rpos, s.rpos);
-    ::swap(limit, s.limit);
-  }
-};
-
-/////////////////////////// compress() ///////////////////////
-
-// Compress in to out in multiple blocks. Default ME is "14,128,0"
-// Default filename is "". Comment is appended to input size.
-// dosha1 means save the SHA-1 checksum.
-void compress(Reader* in, Writer* out, const char* ME,
-     const char* filename=0, const char* comment=0, bool dosha1=true);
-
-// Same as compress() but output is 1 block, ignoring block size parameter.
-void compressBlock(SB* in, Writer* out, const char* ME,
-     const char* filename=0, const char* comment=0, bool dosha1=true);
-
-
-// Read 16 bit little-endian number
-I toU16(const char* p) {
-  return (p[0]&255)+256*(p[1]&255);
-}
-
-// Default read() and write()
-I Reader::read(char* buf, I n) {
-  I i=0, c;
-  while (i<n && (c=get())>=0)
-    buf[i++]=c;
-  return i;
-}
-
-void Writer::write(const char* buf, I n) {
-  Q (I i=0; i<n; ++i)
-    put(U8(buf[i]));
-}
-
-void allocx(U8* &p, I &n, I newsize) {
-  p=0;
-  n=0;
-}
-
-
-//////////////////////////// Component ///////////////////////
-
-// A Component is a context model, indirect context model, match model,
-// fixed weight mixer, adaptive 2 input mixer without or with current
-// partial byte as context, adaptive m input mixer (without or with),
-// or SSE (without or with).
-
-const I compsize[256]={0,2,3,2,3,4,6,6,3,5};
-
-// void Component::init() {
-//   z=cxt=a=b=c=0;
-//   cm.resize(0);
-//   ht.resize(0);
-//   a16.resize(0);
-// }
-
-////////////////////////// StateTable ////////////////////////
-
-// sns[i*4] -> next state O 0, next state O 1, n0, n1
-static const U8 sns[1024]={
+const U8 sns[1024]={
      1,     2,     0,     0,     3,     5,     1,     0,
      4,     6,     0,     1,     7,     9,     2,     0,
      8,    11,     1,     1,     8,    11,     1,     1,
@@ -784,732 +583,489 @@ static const U8 sns[1024]={
     86,   254,     1,    48,     0,     0,     0,     0
 };
 
-// Initialize next state table ns[state*4] -> next O 0, next O 1, n0, n1
-StateTable::StateTable() {
-  memcpy(ns, sns, sizeof(ns));
-}
+struct StateTable {
+  U8 ns[1024]; 
+  I next(I s, I y) { return ns[s*4+y]; }
+  I cminit(I s) { return ((ns[s*4+3]*2+1)<<22)/(ns[s*4+2]+ns[s*4+3]+1); }
+  StateTable() {memcpy(ns, sns, sizeof(ns));}
+};
 
-/////////////////////////// ZP //////////////////////////
-
-// Write D to out2, return true O HCOMP/PCOMP section is present.
-// O pp is true, then write only the postprocessor code.
-bool ZP::write(Writer* out2, bool pp) {
-  O (D.size()<=6) return false;
-  O (!pp) {  // O not a postprocessor then write COMP
-    Q (I i=0; i<cend; ++i)
-      out2->put(D[i]);
+struct P {
+  P(ZP& zr): c8(1), hmap4(1), z(zr) {
+    pcode=0;
+    pcode_size=0;
+    initTables=false;
   }
-  Y {  // write PCOMP size only
-    out2->put((hend-hbegin)&255);
-    out2->put((hend-hbegin)>>8);
+  void init();   
+  I predict();     
+  void update(I y); 
+  I stat(I);   
+  bool isModeled() {  
+    return z.D[6]!=0;
   }
-  Q (I i=hbegin; i<hend; ++i)
-    out2->put(D[i]);
-  return true;
-}
 
-// Read D from in2
-I ZP::read(Reader* in2) {
+  I c8, hmap4, p[256]; 
+  U32 h[256];           // unrolled copy of z.h
+  ZP& z;             // VM to compute context hashes, includes H, n
+  Component comp[256];  // the model, includes P
+  bool initTables;      // are tables initialized?
 
-  // Get D size and allocate
-  I hsize=in2->get();
-  hsize+=in2->get()*256;
-  D.resize(hsize+300);
-  cend=hbegin=hend=0;
-  D[cend++]=hsize&255;
-  D[cend++]=hsize>>8;
-  while (cend<7) D[cend++]=in2->get(); // hh hm ph pm n
+  I dt2k[256];        // division table Q match: dt2k[i] = 2^12/i
+  I dt[1024];         // division table Q cm: dt[i] = 2^16/(i+1.5)
+  U16 squasht[4096];    // squash() lookup table
+  short stretcht[32768];// stretch() lookup table
+  StateTable st;        // next, cminit functions
+  U8* pcode;            // JIT code Q predict() and update()
+  I pcode_size;       // length of pcode
 
-  // Read COMP
-  I n=D[cend-1];
-  Q (I i=0; i<n; ++i) {
-    I type=in2->get();  // component type
-    O (type<0 || type>255) E("unexpected end of file");
-    D[cend++]=type;  // component type
-    I size=compsize[type];
-    O (size<1) E("Invalid component type");
-    O (cend+size>hsize) E("COMP overflows D");
-    Q (I j=1; j<size; ++j)
-      D[cend++]=in2->get();
+  void train(Component& cr, I y) {
+    // assert(y==0 || y==1);
+    U32& pn=cr.cm(cr.cxt);
+    U32 count=pn&0x3ff;
+    I E=y*32767-(cr.cm(cr.cxt)>>17);
+    pn+=(E*dt[count]&-1024)+(count<cr.z);
   }
-  O ((D[cend++]=in2->get())!=0) E("missing COMP END");
 
-  // Insert a guard gap and read HCOMP
-  hbegin=hend=cend+128;
-  O (hend>hsize+129) E("missing HCOMP");
-  while (hend<hsize+129) {
-    // assert(hend<D.isize()-8);
-    I op=in2->get();
-    O (op==-1) E("unexpected end of file");
-    D[hend++]=op;
+  I squash(I x) { return squasht[x+2048]; }
+
+  I stretch(I x) { return stretcht[x]; }
+
+  I clamp2k(I x) {
+    O (x<-2048) return -2048;
+    Y O (x>2047) return 2047;
+    Y return x;
   }
-  O ((D[hend++]=in2->get())!=0) E("missing HCOMP END");
-  allocx(rcode, rcode_size, 0);  // clear JIT code
-  return cend+hend-hbegin;
+
+  I clamp512k(I x) {
+    O (x<-(1<<19)) return -(1<<19);
+    Y O (x>=(1<<19)) return (1<<19)-1;
+    Y return x;
+  }
+
+  size_t find(Array<U8>& ht, I sizebits, U32 cxt) {
+    I chk=cxt>>sizebits&255;
+    size_t h0=(cxt*16)&(ht.size()-16);
+    O (ht[h0]==chk) return h0;
+    size_t h1=h0^16;
+    O (ht[h1]==chk) return h1;
+    size_t h2=h0^32;
+    O (ht[h2]==chk) return h2;
+    O (ht[h0+1]<=ht[h1+1] && ht[h0+1]<=ht[h2+1])
+        return memset(&ht[h0], 0, 16), ht[h0]=chk, h0;
+    Y O (ht[h1+1]<ht[h2+1])
+        return memset(&ht[h1], 0, 16), ht[h1]=chk, h1;
+    Y
+        return memset(&ht[h2], 0, 16), ht[h2]=chk, h2;
+    }
+};
+
+struct Decoder: Reader {
+  Reader* in;        // destination
+  Decoder(ZP& z):
+    in(0), low(1), high(0xFFFFFFFF), curr(0), rpos(0), wpos(0),
+    pr(z), buf(BUFSIZE) {}
+
+  I decompress() {
+    O (pr.isModeled()) {  // n>0 components?
+      O (curr==0) {  // segment initialization
+        F(4)curr=curr<<8|get();
+      }
+      O (decode(0)) {
+        // O (curr!=0) E("decoding end of stream");
+        return -1;
+      }
+      Y {
+        I c=1;
+        while (c<256) {  // get 8 bits
+          I p=pr.predict()*2+1;
+          c+=c+decode(p);
+          pr.update(c&1);
+        }
+        return c-256;
+      }
+    }
+    Y {
+      O (curr==0) {
+        F(4)curr=curr<<8|get();
+        O (curr==0) return -1;
+      }
+      --curr;
+      return get();
+    }
+  }
+
+  I skip() {
+    I c=-1;
+    O (pr.isModeled()) {
+      while (curr==0)  // at start?
+        curr=get();
+      while (curr && (c=get())>=0)  // find 4 zeros
+        curr=curr<<8|c;
+      while ((c=get())==0) ;  // might be more than 4
+      return c;
+    }
+    Y {
+      O (curr==0)  // at start?
+        Q (I i=0; i<4 && (c=get())>=0; ++i) curr=curr<<8|c;
+      while (curr>0) {
+        while (curr>0) {
+          --curr;
+          O (get()<0) return E("skipped to EOF"), -1;
+        }
+        Q (I i=0; i<4 && (c=get())>=0; ++i) curr=curr<<8|c;
+      }
+      O (c>=0) c=get();
+      return c;
+    }
+  }
+
+  void init() {
+    pr.init();
+    O (pr.isModeled()) low=1, high=0xFFFFFFFF, curr=0;
+    Y low=high=curr=0;
+  }
+  I stat(I x) {return pr.stat(x);}
+  I get() {        // return 1 byte of buffered input or EOF
+    O (rpos==wpos) {
+      rpos=0;
+      wpos=in ? in->read(&buf[0], BUFSIZE) : 0;
+    //   assert(wpos<=BUFSIZE);
+    }
+    return rpos<wpos ? U8(buf[rpos++]) : -1;
+  }
+  I buffered() {return wpos-rpos;}  // how far read ahead?
+  U32 low, high;     // range
+  U32 curr;          // L 4 bytes of archive or remaining bytes in subblock
+  U32 rpos, wpos;    // read, write position in buf
+  P pr;      // to get p
+  enum {BUFSIZE=1<<16};
+  Array<char> buf;   // input buffer of size BUFSIZE bytes
+  I decode(I p) {
+    U32 mid=low+U32(((high-low)*U64(U32(p)))>>16); 
+    I y;
+    O (curr<=mid) y=1, high=mid; 
+    Y y=0, low=mid+1;
+    while ((high^low)<0x1000000) { 
+      high=high<<8|255;
+      low=low<<8;
+      low+=(low==0);
+      I c=get();
+      curr=curr<<8|c;
+    }
+    return y;
+  }
+};
+
+struct PostProcessor {
+  I state, hsize, ph, pm;
+  ZP z;     // holds PCOMP
+  PostProcessor(Writer* out): state(0), hsize(0), ph(0), pm(0) {z.output=out;}
+  void init(I h, I m) {
+    state=hsize=0;
+    ph=h;
+    pm=m;
+    z.clear();
+  }
+  
+  I write(I c) {
+    switch (state) {
+      case 0: 
+        state=c+1; 
+        O (state==1) z.clear();
+        break;
+      case 1: 
+        z.outc(c);
+        break;
+      case 2:
+        hsize=c;
+        state=3;
+        break;
+      case 3:
+        hsize+=c*256; 
+        z.D.resize(hsize+300);
+        z.cend=8;
+        z.hbegin=z.hend=z.cend+128;
+        z.D[4]=ph;
+        z.D[5]=pm;
+        state=4;
+        break;
+      case 4: 
+        z.D[z.hend++]=c;  
+        O (z.hend-z.hbegin==hsize) {
+          hsize=z.cend-2+z.hend-z.hbegin;
+          z.D[0]=hsize&255; 
+          z.D[1]=hsize>>8;
+          z.initp();
+          state=5;
+        }
+        break;
+      case 5: 
+        z.run(c);
+        O (c<0) z.flush();
+        break;
+    }
+    return state;
+  }
+  I getState() const {return state;}
+};
+
+struct D {
+  D(Reader* in, Writer* out): z(), dec(z), pp(out) {
+    dec.in=in;
+  }
+  void findBlock() {
+    I c = dec.get();
+    z.read(&dec);
+  }
+  void decompress() {
+    dec.init();
+    pp.init(z.D[4], z.D[5]);
+
+    while ((pp.getState()&3)!=1)
+      pp.write(dec.decompress());
+
+    while (1) {
+      I c=dec.decompress();
+      pp.write(c);
+      O (c==-1) {
+        return;
+      }
+    }
+  }
+  ZP z;
+  Decoder dec;
+  PostProcessor pp;
+};
+
+void decompress(Reader* in, Writer* out) {
+  D d{in,out};
+  d.findBlock();      // don't calculate memory
+  d.decompress();           // to end of segment
 }
 
-// Free memory, but preserve output, sha1 poIers
-void ZP::clear() {
-  cend=hbegin=hend=0;  // COMP and HCOMP locations
-  a=b=c=d=f=pc=0;      // machine state
-  D.resize(0);
-  h.resize(0);
-  m.resize(0);
-  r.resize(0);
-  allocx(rcode, rcode_size, 0);
-}
+struct Encoder {
+  Encoder(ZP& z, I size=0): out(0), low(1), high(0xFFFFFFFF), pr(z) {}
+  void init() {
+    low=1;
+    high=0xFFFFFFFF;
+    pr.init();
+    O (!pr.isModeled()) low=0, buf.resize(1<<16);
+  }
+  void compress(I c) {
+    O (c==-1)
+      encode(1, 0);
+    Y {
+      encode(0, 0);
+      Q (I i=7; i>=0; --i) {
+        I p=pr.predict()*2+1;
+        I y=c>>i&1;
+        encode(y, p);
+        pr.update(y);
+      }
+    }
+  }
+  I stat(I x) {return pr.stat(x);}
+  Writer* out; 
+  U32 low, high;
+  P pr;  
+  Array<char> buf; 
+  void encode(I y, I p) {
+    U32 mid=low+U32(((high-low)*U64(U32(p)))>>16); 
+    O (y) high=mid; Y low=mid+1; 
+    while ((high^low)<0x1000000) {
+      out->put(high>>24);  
+      high=high<<8|255;
+      low=low<<8;
+      low+=(low==0); 
+    }
+  }
+};
 
-// Constructor
-ZP::ZP() {
-  output=0;
-  rcode=0;
-  rcode_size=0;
-  clear();
-  outbuf.resize(1<<14);
-  bufptr=0;
-}
+struct Compiler {
+  Compiler(const char* in, I* args, ZP& hz, ZP& pz);
+  const char* in;  // ZP source code
+  I* args;       // Array of up to 9 args, default NULL = all 0
+  ZP &hz, &pz;       // Output of PCOMP section
+  // Writer* out2;    // Output ... of "PCOMP ... ;"
+  I line, state;       // parse state: 0=space -1=word >0 (nest level)
 
-ZP::~ZP() {
-  allocx(rcode, rcode_size, 0);
-}
+  // Symbolic constants
+  typedef enum {NONE,CONS,CM,ICM,MATCH,AVG,MIX2,MIX,ISSE,SSE,
+    JT=39,JF=47,JMP=63,LJ=255,
+    POST=256,PCOMP,END,IF,IFNOT,ELSE,ENDIF,DO,
+    WHILE,UNTIL,QEVER,IFL,IFNOTL,ELSEL,SEMICOLON} CompType;
 
-// Initialize machine state as HCOMP
-void ZP::inith() {
-  init(D[2], D[3]); // hh, hm
-}
+  void next() {
+    Q (; *in; ++in) {
+      O (*in=='\n') ++line;
+      O (*in=='(') state+=1+(state<0);
+      Y O (state>0 && *in==')') --state;
+      Y O (state<0 && *in<=' ') state=0;
+      Y O (state==0 && *in>' ') {state=-1; break;}
+    }
+  }
+  bool matchToken(const char* word) {
+    const char* a=in;
+    Q (; (*a>' ' && *a!='(' && *word); ++a, ++word)
+      O (tolower(*a)!=tolower(*word)) return false;
+    return !*word && (*a<=' ' || *a=='(');
+  }
+  I rtoken(I low, I high) {
+    next();
+    I r=0;
+    O (in[0]=='$' && in[1]>='1' && in[1]<='9') {
+      O (in[2]=='+') r=atoi(in+3);
+      O (args) r+=args[in[1]-'1'];
+    }
+    Y O (in[0]=='-' || (in[0]>='0' && in[0]<='9')) r=atoi(in);
+    return r;
+  }
+  I rtoken(const char* list[]) {
+    next();
+    Q (I i=0; list[i]; ++i)
+      O (matchToken(list[i]))
+        return i;
+    E();
+    return -1; // not reached
+  }
+  I compile_comp(ZP& z);      // compile either HCOMP or PCOMP
 
-// Initialize machine state as PCOMP
-void ZP::initp() {
-  init(D[4], D[5]); // ph, pm
-}
+  // Stack of n elements
+  struct Stack {
+    LQ::Array<U16> s;
+    size_t top;
+    Stack(I n): s(n), top(0) {}
+    void push(const U16& x) {
+      O (top>=s.size()) E();// E("O or DO nested too deep");
+      s[top++]=x;
+    }
+    U16 pop() {
+      O (top<=0) E();// E("unmatched O or DO");
+      return s[--top];
+    }
+  };
 
-// Flush pending output
-void ZP::flush() {
-  O (output) output->write(&outbuf[0], bufptr);
-  bufptr=0;
-}
+  Stack if_stack, do_stack;
+};
 
-// pow(2, x)
-static double pow2(I x) {
+struct C {
+  C(Reader* i, Writer* out): enc(z), in(i), state(INIT) {enc.out=out;}
+  void startBlock(const char* config,     // ZP source code
+                  I* args) {
+    Compiler(config, args, z, pz);
+    enc.out->put(1+(z.D[6]==0));  // level 1 or 2
+    z.write(enc.out, false);
+    state=BLOCK1;
+  }
+  void startSegment() {
+    O (state==BLOCK1) state=SEG1;
+    O (state==BLOCK2) state=SEG2;
+  }
+  void postProcess(const char* pcomp = 0, I len = 0); 
+  bool compress(I n = -1); 
+  void endSegment() {
+    O (state==SEG1)
+      postProcess();
+
+    enc.compress(-1);
+
+    enc.out->put(0);
+    enc.out->put(0);
+    enc.out->put(0);
+    enc.out->put(0);
+    enc.out->put(254);
+
+    state=BLOCK2;
+  }
+  I stat(I x) {return enc.stat(x);}
+  ZP z, pz; 
+  Encoder enc; 
+  Reader* in; 
+  enum {INIT, BLOCK1, SEG1, BLOCK2, SEG2} state;
+};
+
+struct SB: Reader, Writer {
+  unsigned char* p;
+  size_t al,wpos,rpos,limit,init;
+
+  // Increase capacity to a without changing size
+  void reserve(size_t a) {
+    O (a<=al) return;
+    unsigned char* q=0;
+    O (a>0) q=(unsigned char*)(p ? realloc(p, a) : malloc(a));
+    O (a>0 && !q) E(); // E("Out of memory");
+    p=q;
+    al=a;
+  }
+
+  // Enlarge al to make room to write at least n bytes.
+  void lengthen(size_t n) {
+    // assert(wpos<=al);
+    // O (wpos+n>limit || wpos+n<wpos) E("SB overflow");
+    O (wpos+n<=al) return;
+    size_t a=al;
+    while (wpos+n>=a) a=a*2+init;
+    reserve(a);
+  }
+
+  void operator=(const SB&);
+  SB(const SB&);
+
+  unsigned char* data() {return p;}
+
+  SB(size_t n=0): p(0), al(0), wpos(0), rpos(0), limit(size_t(-1)), init(n>128?n:128) {}
+
+  ~SB() {O (p) free(p);}
+
+  size_t size() const {return wpos;}
+
+  void put(I c) {  // write 1 byte
+    lengthen(1);
+    p[wpos++]=c;
+  }
+
+  void write(const char* buf, I n) {
+    O (n<1) return;
+    lengthen(n);
+    O (buf) memcpy(p+wpos, buf, n);
+    wpos+=n;
+  }
+
+  I get() {
+    return rpos<wpos ? p[rpos++] : -1;
+  }
+
+  I read(char* buf, I n) {
+    O (rpos+n>wpos) n=wpos-rpos;
+    O (n>0 && buf) memcpy(buf, p+rpos, n);
+    rpos+=n;
+    return n;
+  }
+
+  const char* c_str() const {return (const char*)p;}
+
+  void resize(size_t i) {
+    wpos=i;
+    O (rpos>wpos) rpos=wpos;
+  }
+
+  void swap(SB& s) {
+    ::swap(p, s.p);
+    ::swap(al, s.al);
+    ::swap(wpos, s.wpos);
+    ::swap(rpos, s.rpos);
+    ::swap(limit, s.limit);
+  }
+};
+
+
+double pow2(I x) {
   double r=1;
   Q (; x>0; x--) r+=r;
   return r;
 }
 
-// Return memory requirement in bytes
-double ZP::memory() {
-  double mem=pow2(D[2]+2)+pow2(D[3])  // hh hm
-            +pow2(D[4]+2)+pow2(D[5])  // ph pm
-            +D.size();
-  I cp=7;  // start of comp list
-  Q (I i=0; i<D[6]; ++i) {  // n
-    // assert(cp<cend);
-    double size=pow2(D[cp+1]); // sizebits
-    switch(D[cp]) {
-      case CM: mem+=4*size; break;
-      case ICM: mem+=64*size+1024; break;
-      case MATCH: mem+=4*size+pow2(D[cp+2]); break; // bufbits
-      case MIX2: mem+=2*size; break;
-      case MIX: mem+=4*size*D[cp+3]; break; // m
-      case ISSE: mem+=64*size+2048; break;
-      case SSE: mem+=128*size; break;
-    }
-    cp+=compsize[D[cp]];
-  }
-  return mem;
-}
-
-// Initialize machine state to run a program.
-void ZP::init(I hbits, I mbits) {
-  O (hbits>32) E("H too big");
-  O (mbits>32) E("M too big");
-  h.resize(1, hbits);
-  m.resize(1, mbits);
-  r.resize(256);
-  a=b=c=d=pc=f=0;
-}
-
-// Run program on input by Ierpreting D
-// void ZP::run0(U32 input) {
-//   pc=hbegin;
-//   a=input;
-//   while (execute()) ;
-// }
-
-// Execute one instruction, return 0 after HALT Y 1
-I ZP::execute() {
-  switch(D[pc++]) {
-    case 0:err(); break; // E
-    case 1:++a; break; // A++
-    case 2:--a; break; // A--
-    case 3:a = ~a; break; // A!
-    case 4:a = 0; break; // A=0
-    case 7:a = r[D[pc++]]; break; // A=R N
-    case 8:swap(b); break; // B<>A
-    case 9:++b; break; // B++
-    case 10:--b; break; // B--
-    case 11:b = ~b; break; // B!
-    case 12:b = 0; break; // B=0
-    case 15:b = r[D[pc++]]; break; // B=R N
-    case 16:swap(c); break; // C<>A
-    case 17:++c; break; // C++
-    case 18:--c; break; // C--
-    case 19:c = ~c; break; // C!
-    case 20:c = 0; break; // C=0
-    case 23:c = r[D[pc++]]; break; // C=R N
-    case 24:swap(d); break; // D<>A
-    case 25:++d; break; // D++
-    case 26:--d; break; // D--
-    case 27:d = ~d; break; // D!
-    case 28:d = 0; break; // D=0
-    case 31:d = r[D[pc++]]; break; // D=R N
-    case 32:swap(m(b)); break; // *B<>A
-    case 33:++m(b); break; // *B++
-    case 34:--m(b); break; // *B--
-    case 35:m(b) = ~m(b); break; // *B!
-    case 36:m(b) = 0; break; // *B=0
-    case 39:O (f) pc+=((D[pc]+128)&255)-127; Y ++pc; break; // JT N
-    case 40:swap(m(c)); break; // *C<>A
-    case 41:++m(c); break; // *C++
-    case 42:--m(c); break; // *C--
-    case 43:m(c) = ~m(c); break; // *C!
-    case 44:m(c) = 0; break; // *C=0
-    case 47:O (!f) pc+=((D[pc]+128)&255)-127; Y ++pc; break; // JF N
-    case 48:swap(h(d)); break; // *D<>A
-    case 49:++h(d); break; // *D++
-    case 50:--h(d); break; // *D--
-    case 51:h(d) = ~h(d); break; // *D!
-    case 52:h(d) = 0; break; // *D=0
-    case 55:r[D[pc++]] = a; break; // R=A N
-    case 56:return 0  ; // HALT
-    case 57:outc(a&255); break; // OUT
-    case 59:a = (a+m(b)+512)*773; break; // HASH
-    case 60:h(d) = (h(d)+a+512)*773; break; // HASHD
-    case 63:pc+=((D[pc]+128)&255)-127; break; // JMP N
-    case 64:break; // A=A
-    case 65:a = b; break; // A=B
-    case 66:a = c; break; // A=C
-    case 67:a = d; break; // A=D
-    case 68:a = m(b); break; // A=*B
-    case 69:a = m(c); break; // A=*C
-    case 70:a = h(d); break; // A=*D
-    case 71:a = D[pc++]; break; // A= N
-    case 72:b = a; break; // B=A
-    case 73:break; // B=B
-    case 74:b=c; break; // B=C
-    case 75:b=d; break; // B=D
-    case 76:b=m(b); break; // B=*B
-    case 77:b=m(c); break; // B=*C
-    case 78:b=h(d); break; // B=*D
-    case 79:b=D[pc++]; break; // B= N
-    case 80:c=a; break; // C=A
-    case 81:c=b; break; // C=B
-    case 82:break; // C=C
-    case 83:c=d; break; // C=D
-    case 84:c=m(b); break; // C=*B
-    case 85:c=m(c); break; // C=*C
-    case 86:c=h(d); break; // C=*D
-    case 87:c=D[pc++]; break; // C= N
-    case 88:d=a; break; // D=A
-    case 89:d=b; break; // D=B
-    case 90:d=c; break; // D=C
-    case 91:break; // D=D
-    case 92:d=m(b); break; // D=*B
-    case 93:d=m(c); break; // D=*C
-    case 94:d=h(d); break; // D=*D
-    case 95:d=D[pc++]; break; // D= N
-    case 96:m(b)=a; break; // *B=A
-    case 97:m(b)=b; break; // *B=B
-    case 98:m(b)=c; break; // *B=C
-    case 99:m(b)=d; break; // *B=D
-    case 100:break; // *B=*B
-    case 101:m(b)=m(c); break; // *B=*C
-    case 102:m(b)=h(d); break; // *B=*D
-    case 103:m(b)=D[pc++]; break; // *B= N
-    case 104:m(c)=a; break; // *C=A
-    case 105:m(c)=b; break; // *C=B
-    case 106:m(c)=c; break; // *C=C
-    case 107:m(c)=d; break; // *C=D
-    case 108:m(c)=m(b); break; // *C=*B
-    case 109:break; // *C=*C
-    case 110:m(c)=h(d); break; // *C=*D
-    case 111:m(c)=D[pc++]; break; // *C= N
-    case 112:h(d)=a; break; // *D=A
-    case 113:h(d)=b; break; // *D=B
-    case 114:h(d)=c; break; // *D=C
-    case 115:h(d)=d; break; // *D=D
-    case 116:h(d)=m(b); break; // *D=*B
-    case 117:h(d)=m(c); break; // *D=*C
-    case 118:break; // *D=*D
-    case 119:h(d)=D[pc++]; break; // *D= N
-    case 128:a+=a; break; // A+=A
-    case 129:a+=b; break; // A+=B
-    case 130:a+=c; break; // A+=C
-    case 131:a+=d; break; // A+=D
-    case 132:a+=m(b); break; // A+=*B
-    case 133:a+=m(c); break; // A+=*C
-    case 134:a+=h(d); break; // A+=*D
-    case 135:a+=D[pc++]; break; // A+= N
-    case 136:a-=a; break; // A-=A
-    case 137:a-=b; break; // A-=B
-    case 138:a-=c; break; // A-=C
-    case 139:a-=d; break; // A-=D
-    case 140:a-=m(b); break; // A-=*B
-    case 141:a-=m(c); break; // A-=*C
-    case 142:a-=h(d); break; // A-=*D
-    case 143:a-=D[pc++]; break; // A-= N
-    case 144:a*=a; break; // A*=A
-    case 145:a*=b; break; // A*=B
-    case 146:a*=c; break; // A*=C
-    case 147:a*=d; break; // A*=D
-    case 148:a*=m(b); break; // A*=*B
-    case 149:a*=m(c); break; // A*=*C
-    case 150:a*=h(d); break; // A*=*D
-    case 151:a*=D[pc++]; break; // A*= N
-    case 152:div(a); break; // A/=A
-    case 153:div(b); break; // A/=B
-    case 154:div(c); break; // A/=C
-    case 155:div(d); break; // A/=D
-    case 156:div(m(b)); break; // A/=*B
-    case 157:div(m(c)); break; // A/=*C
-    case 158:div(h(d)); break; // A/=*D
-    case 159:div(D[pc++]); break; // A/= N
-    case 160:mod(a); break; // A%=A
-    case 161:mod(b); break; // A%=B
-    case 162:mod(c); break; // A%=C
-    case 163:mod(d); break; // A%=D
-    case 164:mod(m(b)); break; // A%=*B
-    case 165:mod(m(c)); break; // A%=*C
-    case 166:mod(h(d)); break; // A%=*D
-    case 167:mod(D[pc++]); break; // A%= N
-    case 168:a&=a; break; // A&=A
-    case 169:a&=b; break; // A&=B
-    case 170:a&=c; break; // A&=C
-    case 171:a&=d; break; // A&=D
-    case 172:a&=m(b); break; // A&=*B
-    case 173:a&=m(c); break; // A&=*C
-    case 174:a&=h(d); break; // A&=*D
-    case 175:a&=D[pc++]; break; // A&= N
-    case 176:a&=~a; break; // A&~A
-    case 177:a&=~b; break; // A&~B
-    case 178:a&=~c; break; // A&~C
-    case 179:a&=~d; break; // A&~D
-    case 180:a&=~m(b); break; // A&~*B
-    case 181:a&=~m(c); break; // A&~*C
-    case 182:a&=~h(d); break; // A&~*D
-    case 183:a&=~D[pc++]; break; // A&~ N
-    case 184:a|=a; break; // A|=A
-    case 185:a|=b; break; // A|=B
-    case 186:a|=c; break; // A|=C
-    case 187:a|=d; break; // A|=D
-    case 188:a|=m(b); break; // A|=*B
-    case 189:a|=m(c); break; // A|=*C
-    case 190:a|=h(d); break; // A|=*D
-    case 191:a|=D[pc++]; break; // A|= N
-    case 192:a^=a; break; // A^=A
-    case 193:a^=b; break; // A^=B
-    case 194:a^=c; break; // A^=C
-    case 195:a^=d; break; // A^=D
-    case 196:a^=m(b); break; // A^=*B
-    case 197:a^=m(c); break; // A^=*C
-    case 198:a^=h(d); break; // A^=*D
-    case 199:a^=D[pc++]; break; // A^= N
-    case 200:a<<=(a&31); break; // A<<=A
-    case 201:a<<=(b&31); break; // A<<=B
-    case 202:a<<=(c&31); break; // A<<=C
-    case 203:a<<=(d&31); break; // A<<=D
-    case 204:a<<=(m(b)&31); break; // A<<=*B
-    case 205:a<<=(m(c)&31); break; // A<<=*C
-    case 206:a<<=(h(d)&31); break; // A<<=*D
-    case 207:a<<=(D[pc++]&31); break; // A<<= N
-    case 208:a>>=(a&31); break; // A>>=A
-    case 209:a>>=(b&31); break; // A>>=B
-    case 210:a>>=(c&31); break; // A>>=C
-    case 211:a>>=(d&31); break; // A>>=D
-    case 212:a>>=(m(b)&31); break; // A>>=*B
-    case 213:a>>=(m(c)&31); break; // A>>=*C
-    case 214:a>>=(h(d)&31); break; // A>>=*D
-    case 215:a>>=(D[pc++]&31); break; // A>>= N
-    case 216:f=1; break; // A==A
-    case 217:f=(a==b); break; // A==B
-    case 218:f=(a==c); break; // A==C
-    case 219:f=(a==d); break; // A==D
-    case 220:f=(a==U32(m(b))); break; // A==*B
-    case 221:f=(a==U32(m(c))); break; // A==*C
-    case 222:f=(a==h(d)); break; // A==*D
-    case 223:f=(a==U32(D[pc++])); break; // A== N
-    case 224:f=0;break; // A<A
-    case 225:f=(a<b); break; // A<B
-    case 226:f=(a<c); break; // A<C
-    case 227:f=(a<d); break; // A<D
-    case 228:f=(a<U32(m(b))); break; // A<*B
-    case 229:f=(a<U32(m(c))); break; // A<*C
-    case 230:f=(a<h(d)); break; // A<*D
-    case 231:f=(a<U32(D[pc++])); break; // A< N
-    case 232:f=0;break; // A>A
-    case 233:f=(a>b); break; // A>B
-    case 234:f=(a>c); break; // A>C
-    case 235:f=(a>d); break; // A>D
-    case 236:f=(a>U32(m(b))); break; // A>*B
-    case 237:f=(a>U32(m(c))); break; // A>*C
-    case 238:f=(a>h(d)); break; // A>*D
-    case 239:f=(a>U32(D[pc++])); break; // A> N
-    case 255:O((pc=hbegin+D[pc]+256*D[pc+1])>=hend)err();break;//LJ
-    default: err();
-  }
-  return 1;
-}
-
-// PrI illegal instruction E message and exit
-// void ZP::err() {
-//   E("ZP execution E");
-// }
-
-///////////////////////// P /////////////////////////
-
-// sdt2k[i]=2048/i;
-// static const I sdt2k[256]={
-//      0,  2048,  1024,   682,   512,   409,   341,   292,
-//    256,   227,   204,   186,   170,   157,   146,   136,
-//    128,   120,   113,   107,   102,    97,    93,    89,
-//     85,    81,    78,    75,    73,    70,    68,    66,
-//     64,    62,    60,    58,    56,    55,    53,    52,
-//     51,    49,    48,    47,    46,    45,    44,    43,
-//     42,    41,    40,    40,    39,    38,    37,    37,
-//     36,    35,    35,    34,    34,    33,    33,    32,
-//     32,    31,    31,    30,    30,    29,    29,    28,
-//     28,    28,    27,    27,    26,    26,    26,    25,
-//     25,    25,    24,    24,    24,    24,    23,    23,
-//     23,    23,    22,    22,    22,    22,    21,    21,
-//     21,    21,    20,    20,    20,    20,    20,    19,
-//     19,    19,    19,    19,    18,    18,    18,    18,
-//     18,    18,    17,    17,    17,    17,    17,    17,
-//     17,    16,    16,    16,    16,    16,    16,    16,
-//     16,    15,    15,    15,    15,    15,    15,    15,
-//     15,    14,    14,    14,    14,    14,    14,    14,
-//     14,    14,    14,    13,    13,    13,    13,    13,
-//     13,    13,    13,    13,    13,    13,    12,    12,
-//     12,    12,    12,    12,    12,    12,    12,    12,
-//     12,    12,    12,    11,    11,    11,    11,    11,
-//     11,    11,    11,    11,    11,    11,    11,    11,
-//     11,    11,    11,    10,    10,    10,    10,    10,
-//     10,    10,    10,    10,    10,    10,    10,    10,
-//     10,    10,    10,    10,    10,     9,     9,     9,
-//      9,     9,     9,     9,     9,     9,     9,     9,
-//      9,     9,     9,     9,     9,     9,     9,     9,
-//      9,     9,     9,     9,     8,     8,     8,     8,
-//      8,     8,     8,     8,     8,     8,     8,     8,
-//      8,     8,     8,     8,     8,     8,     8,     8,
-//      8,     8,     8,     8,     8,     8,     8,     8
-// };
-
-// sdt[i]=(1<<17)/(i*2+3)*2;
-// static const I sdt[1024]={
-//  87380, 52428, 37448, 29126, 23830, 20164, 17476, 15420,
-//  13796, 12482, 11396, 10484,  9708,  9038,  8456,  7942,
-//   7488,  7084,  6720,  6392,  6096,  5824,  5576,  5348,
-//   5140,  4946,  4766,  4598,  4442,  4296,  4160,  4032,
-//   3912,  3798,  3692,  3590,  3494,  3404,  3318,  3236,
-//   3158,  3084,  3012,  2944,  2880,  2818,  2758,  2702,
-//   2646,  2594,  2544,  2496,  2448,  2404,  2360,  2318,
-//   2278,  2240,  2202,  2166,  2130,  2096,  2064,  2032,
-//   2000,  1970,  1940,  1912,  1884,  1858,  1832,  1806,
-//   1782,  1758,  1736,  1712,  1690,  1668,  1648,  1628,
-//   1608,  1588,  1568,  1550,  1532,  1514,  1496,  1480,
-//   1464,  1448,  1432,  1416,  1400,  1386,  1372,  1358,
-//   1344,  1330,  1316,  1304,  1290,  1278,  1266,  1254,
-//   1242,  1230,  1218,  1208,  1196,  1186,  1174,  1164,
-//   1154,  1144,  1134,  1124,  1114,  1106,  1096,  1086,
-//   1078,  1068,  1060,  1052,  1044,  1036,  1028,  1020,
-//   1012,  1004,   996,   988,   980,   974,   966,   960,
-//    952,   946,   938,   932,   926,   918,   912,   906,
-//    900,   894,   888,   882,   876,   870,   864,   858,
-//    852,   848,   842,   836,   832,   826,   820,   816,
-//    810,   806,   800,   796,   790,   786,   782,   776,
-//    772,   768,   764,   758,   754,   750,   746,   742,
-//    738,   734,   730,   726,   722,   718,   714,   710,
-//    706,   702,   698,   694,   690,   688,   684,   680,
-//    676,   672,   670,   666,   662,   660,   656,   652,
-//    650,   646,   644,   640,   636,   634,   630,   628,
-//    624,   622,   618,   616,   612,   610,   608,   604,
-//    602,   598,   596,   594,   590,   588,   586,   582,
-//    580,   578,   576,   572,   570,   568,   566,   562,
-//    560,   558,   556,   554,   550,   548,   546,   544,
-//    542,   540,   538,   536,   532,   530,   528,   526,
-//    524,   522,   520,   518,   516,   514,   512,   510,
-//    508,   506,   504,   502,   500,   498,   496,   494,
-//    492,   490,   488,   488,   486,   484,   482,   480,
-//    478,   476,   474,   474,   472,   470,   468,   466,
-//    464,   462,   462,   460,   458,   456,   454,   454,
-//    452,   450,   448,   448,   446,   444,   442,   442,
-//    440,   438,   436,   436,   434,   432,   430,   430,
-//    428,   426,   426,   424,   422,   422,   420,   418,
-//    418,   416,   414,   414,   412,   410,   410,   408,
-//    406,   406,   404,   402,   402,   400,   400,   398,
-//    396,   396,   394,   394,   392,   390,   390,   388,
-//    388,   386,   386,   384,   382,   382,   380,   380,
-//    378,   378,   376,   376,   374,   372,   372,   370,
-//    370,   368,   368,   366,   366,   364,   364,   362,
-//    362,   360,   360,   358,   358,   356,   356,   354,
-//    354,   352,   352,   350,   350,   348,   348,   348,
-//    346,   346,   344,   344,   342,   342,   340,   340,
-//    340,   338,   338,   336,   336,   334,   334,   332,
-//    332,   332,   330,   330,   328,   328,   328,   326,
-//    326,   324,   324,   324,   322,   322,   320,   320,
-//    320,   318,   318,   316,   316,   316,   314,   314,
-//    312,   312,   312,   310,   310,   310,   308,   308,
-//    308,   306,   306,   304,   304,   304,   302,   302,
-//    302,   300,   300,   300,   298,   298,   298,   296,
-//    296,   296,   294,   294,   294,   292,   292,   292,
-//    290,   290,   290,   288,   288,   288,   286,   286,
-//    286,   284,   284,   284,   284,   282,   282,   282,
-//    280,   280,   280,   278,   278,   278,   276,   276,
-//    276,   276,   274,   274,   274,   272,   272,   272,
-//    272,   270,   270,   270,   268,   268,   268,   268,
-//    266,   266,   266,   266,   264,   264,   264,   262,
-//    262,   262,   262,   260,   260,   260,   260,   258,
-//    258,   258,   258,   256,   256,   256,   256,   254,
-//    254,   254,   254,   252,   252,   252,   252,   250,
-//    250,   250,   250,   248,   248,   248,   248,   248,
-//    246,   246,   246,   246,   244,   244,   244,   244,
-//    242,   242,   242,   242,   242,   240,   240,   240,
-//    240,   238,   238,   238,   238,   238,   236,   236,
-//    236,   236,   234,   234,   234,   234,   234,   232,
-//    232,   232,   232,   232,   230,   230,   230,   230,
-//    230,   228,   228,   228,   228,   228,   226,   226,
-//    226,   226,   226,   224,   224,   224,   224,   224,
-//    222,   222,   222,   222,   222,   220,   220,   220,
-//    220,   220,   220,   218,   218,   218,   218,   218,
-//    216,   216,   216,   216,   216,   216,   214,   214,
-//    214,   214,   214,   212,   212,   212,   212,   212,
-//    212,   210,   210,   210,   210,   210,   210,   208,
-//    208,   208,   208,   208,   208,   206,   206,   206,
-//    206,   206,   206,   204,   204,   204,   204,   204,
-//    204,   204,   202,   202,   202,   202,   202,   202,
-//    200,   200,   200,   200,   200,   200,   198,   198,
-//    198,   198,   198,   198,   198,   196,   196,   196,
-//    196,   196,   196,   196,   194,   194,   194,   194,
-//    194,   194,   194,   192,   192,   192,   192,   192,
-//    192,   192,   190,   190,   190,   190,   190,   190,
-//    190,   188,   188,   188,   188,   188,   188,   188,
-//    186,   186,   186,   186,   186,   186,   186,   186,
-//    184,   184,   184,   184,   184,   184,   184,   182,
-//    182,   182,   182,   182,   182,   182,   182,   180,
-//    180,   180,   180,   180,   180,   180,   180,   178,
-//    178,   178,   178,   178,   178,   178,   178,   176,
-//    176,   176,   176,   176,   176,   176,   176,   176,
-//    174,   174,   174,   174,   174,   174,   174,   174,
-//    172,   172,   172,   172,   172,   172,   172,   172,
-//    172,   170,   170,   170,   170,   170,   170,   170,
-//    170,   170,   168,   168,   168,   168,   168,   168,
-//    168,   168,   168,   166,   166,   166,   166,   166,
-//    166,   166,   166,   166,   166,   164,   164,   164,
-//    164,   164,   164,   164,   164,   164,   162,   162,
-//    162,   162,   162,   162,   162,   162,   162,   162,
-//    160,   160,   160,   160,   160,   160,   160,   160,
-//    160,   160,   158,   158,   158,   158,   158,   158,
-//    158,   158,   158,   158,   158,   156,   156,   156,
-//    156,   156,   156,   156,   156,   156,   156,   154,
-//    154,   154,   154,   154,   154,   154,   154,   154,
-//    154,   154,   152,   152,   152,   152,   152,   152,
-//    152,   152,   152,   152,   152,   150,   150,   150,
-//    150,   150,   150,   150,   150,   150,   150,   150,
-//    150,   148,   148,   148,   148,   148,   148,   148,
-//    148,   148,   148,   148,   148,   146,   146,   146,
-//    146,   146,   146,   146,   146,   146,   146,   146,
-//    146,   144,   144,   144,   144,   144,   144,   144,
-//    144,   144,   144,   144,   144,   142,   142,   142,
-//    142,   142,   142,   142,   142,   142,   142,   142,
-//    142,   142,   140,   140,   140,   140,   140,   140,
-//    140,   140,   140,   140,   140,   140,   140,   138,
-//    138,   138,   138,   138,   138,   138,   138,   138,
-//    138,   138,   138,   138,   138,   136,   136,   136,
-//    136,   136,   136,   136,   136,   136,   136,   136,
-//    136,   136,   136,   134,   134,   134,   134,   134,
-//    134,   134,   134,   134,   134,   134,   134,   134,
-//    134,   132,   132,   132,   132,   132,   132,   132,
-//    132,   132,   132,   132,   132,   132,   132,   132,
-//    130,   130,   130,   130,   130,   130,   130,   130,
-//    130,   130,   130,   130,   130,   130,   130,   128,
-//    128,   128,   128,   128,   128,   128,   128,   128,
-//    128,   128,   128,   128,   128,   128,   128,   126
-// };
-
-// ssquasht[i]=I(32768.0/(1+exp((i-2048)*(-1.0/64))));
-// Middle 1344 of 4096 entries only.
-// static const U16 ssquasht[1344]={
-//      0,     0,     0,     0,     0,     0,     0,     1,
-//      1,     1,     1,     1,     1,     1,     1,     1,
-//      1,     1,     1,     1,     1,     1,     1,     1,
-//      1,     1,     1,     1,     1,     1,     1,     1,
-//      1,     1,     1,     1,     1,     1,     1,     1,
-//      1,     1,     1,     1,     1,     1,     1,     1,
-//      1,     1,     1,     2,     2,     2,     2,     2,
-//      2,     2,     2,     2,     2,     2,     2,     2,
-//      2,     2,     2,     2,     2,     2,     2,     2,
-//      2,     2,     2,     2,     2,     3,     3,     3,
-//      3,     3,     3,     3,     3,     3,     3,     3,
-//      3,     3,     3,     3,     3,     3,     3,     3,
-//      4,     4,     4,     4,     4,     4,     4,     4,
-//      4,     4,     4,     4,     4,     4,     5,     5,
-//      5,     5,     5,     5,     5,     5,     5,     5,
-//      5,     5,     6,     6,     6,     6,     6,     6,
-//      6,     6,     6,     6,     7,     7,     7,     7,
-//      7,     7,     7,     7,     8,     8,     8,     8,
-//      8,     8,     8,     8,     9,     9,     9,     9,
-//      9,     9,    10,    10,    10,    10,    10,    10,
-//     10,    11,    11,    11,    11,    11,    12,    12,
-//     12,    12,    12,    13,    13,    13,    13,    13,
-//     14,    14,    14,    14,    15,    15,    15,    15,
-//     15,    16,    16,    16,    17,    17,    17,    17,
-//     18,    18,    18,    18,    19,    19,    19,    20,
-//     20,    20,    21,    21,    21,    22,    22,    22,
-//     23,    23,    23,    24,    24,    25,    25,    25,
-//     26,    26,    27,    27,    28,    28,    28,    29,
-//     29,    30,    30,    31,    31,    32,    32,    33,
-//     33,    34,    34,    35,    36,    36,    37,    37,
-//     38,    38,    39,    40,    40,    41,    42,    42,
-//     43,    44,    44,    45,    46,    46,    47,    48,
-//     49,    49,    50,    51,    52,    53,    54,    54,
-//     55,    56,    57,    58,    59,    60,    61,    62,
-//     63,    64,    65,    66,    67,    68,    69,    70,
-//     71,    72,    73,    74,    76,    77,    78,    79,
-//     81,    82,    83,    84,    86,    87,    88,    90,
-//     91,    93,    94,    96,    97,    99,   100,   102,
-//    103,   105,   107,   108,   110,   112,   114,   115,
-//    117,   119,   121,   123,   125,   127,   129,   131,
-//    133,   135,   137,   139,   141,   144,   146,   148,
-//    151,   153,   155,   158,   160,   163,   165,   168,
-//    171,   173,   176,   179,   182,   184,   187,   190,
-//    193,   196,   199,   202,   206,   209,   212,   215,
-//    219,   222,   226,   229,   233,   237,   240,   244,
-//    248,   252,   256,   260,   264,   268,   272,   276,
-//    281,   285,   289,   294,   299,   303,   308,   313,
-//    318,   323,   328,   333,   338,   343,   349,   354,
-//    360,   365,   371,   377,   382,   388,   394,   401,
-//    407,   413,   420,   426,   433,   440,   446,   453,
-//    460,   467,   475,   482,   490,   497,   505,   513,
-//    521,   529,   537,   545,   554,   562,   571,   580,
-//    589,   598,   607,   617,   626,   636,   646,   656,
-//    666,   676,   686,   697,   708,   719,   730,   741,
-//    752,   764,   776,   788,   800,   812,   825,   837,
-//    850,   863,   876,   890,   903,   917,   931,   946,
-//    960,   975,   990,  1005,  1020,  1036,  1051,  1067,
-//   1084,  1100,  1117,  1134,  1151,  1169,  1186,  1204,
-//   1223,  1241,  1260,  1279,  1298,  1318,  1338,  1358,
-//   1379,  1399,  1421,  1442,  1464,  1486,  1508,  1531,
-//   1554,  1577,  1600,  1624,  1649,  1673,  1698,  1724,
-//   1749,  1775,  1802,  1829,  1856,  1883,  1911,  1940,
-//   1968,  1998,  2027,  2057,  2087,  2118,  2149,  2181,
-//   2213,  2245,  2278,  2312,  2345,  2380,  2414,  2450,
-//   2485,  2521,  2558,  2595,  2633,  2671,  2709,  2748,
-//   2788,  2828,  2869,  2910,  2952,  2994,  3037,  3080,
-//   3124,  3168,  3213,  3259,  3305,  3352,  3399,  3447,
-//   3496,  3545,  3594,  3645,  3696,  3747,  3799,  3852,
-//   3906,  3960,  4014,  4070,  4126,  4182,  4240,  4298,
-//   4356,  4416,  4476,  4537,  4598,  4660,  4723,  4786,
-//   4851,  4916,  4981,  5048,  5115,  5183,  5251,  5320,
-//   5390,  5461,  5533,  5605,  5678,  5752,  5826,  5901,
-//   5977,  6054,  6131,  6210,  6289,  6369,  6449,  6530,
-//   6613,  6695,  6779,  6863,  6949,  7035,  7121,  7209,
-//   7297,  7386,  7476,  7566,  7658,  7750,  7842,  7936,
-//   8030,  8126,  8221,  8318,  8415,  8513,  8612,  8712,
-//   8812,  8913,  9015,  9117,  9221,  9324,  9429,  9534,
-//   9640,  9747,  9854,  9962, 10071, 10180, 10290, 10401,
-//  10512, 10624, 10737, 10850, 10963, 11078, 11192, 11308,
-//  11424, 11540, 11658, 11775, 11893, 12012, 12131, 12251,
-//  12371, 12491, 12612, 12734, 12856, 12978, 13101, 13224,
-//  13347, 13471, 13595, 13719, 13844, 13969, 14095, 14220,
-//  14346, 14472, 14599, 14725, 14852, 14979, 15106, 15233,
-//  15361, 15488, 15616, 15744, 15872, 16000, 16128, 16256,
-//  16384, 16511, 16639, 16767, 16895, 17023, 17151, 17279,
-//  17406, 17534, 17661, 17788, 17915, 18042, 18168, 18295,
-//  18421, 18547, 18672, 18798, 18923, 19048, 19172, 19296,
-//  19420, 19543, 19666, 19789, 19911, 20033, 20155, 20276,
-//  20396, 20516, 20636, 20755, 20874, 20992, 21109, 21227,
-//  21343, 21459, 21575, 21689, 21804, 21917, 22030, 22143,
-//  22255, 22366, 22477, 22587, 22696, 22805, 22913, 23020,
-//  23127, 23233, 23338, 23443, 23546, 23650, 23752, 23854,
-//  23955, 24055, 24155, 24254, 24352, 24449, 24546, 24641,
-//  24737, 24831, 24925, 25017, 25109, 25201, 25291, 25381,
-//  25470, 25558, 25646, 25732, 25818, 25904, 25988, 26072,
-//  26154, 26237, 26318, 26398, 26478, 26557, 26636, 26713,
-//  26790, 26866, 26941, 27015, 27089, 27162, 27234, 27306,
-//  27377, 27447, 27516, 27584, 27652, 27719, 27786, 27851,
-//  27916, 27981, 28044, 28107, 28169, 28230, 28291, 28351,
-//  28411, 28469, 28527, 28585, 28641, 28697, 28753, 28807,
-//  28861, 28915, 28968, 29020, 29071, 29122, 29173, 29222,
-//  29271, 29320, 29368, 29415, 29462, 29508, 29554, 29599,
-//  29643, 29687, 29730, 29773, 29815, 29857, 29898, 29939,
-//  29979, 30019, 30058, 30096, 30134, 30172, 30209, 30246,
-//  30282, 30317, 30353, 30387, 30422, 30455, 30489, 30522,
-//  30554, 30586, 30618, 30649, 30680, 30710, 30740, 30769,
-//  30799, 30827, 30856, 30884, 30911, 30938, 30965, 30992,
-//  31018, 31043, 31069, 31094, 31118, 31143, 31167, 31190,
-//  31213, 31236, 31259, 31281, 31303, 31325, 31346, 31368,
-//  31388, 31409, 31429, 31449, 31469, 31488, 31507, 31526,
-//  31544, 31563, 31581, 31598, 31616, 31633, 31650, 31667,
-//  31683, 31700, 31716, 31731, 31747, 31762, 31777, 31792,
-//  31807, 31821, 31836, 31850, 31864, 31877, 31891, 31904,
-//  31917, 31930, 31942, 31955, 31967, 31979, 31991, 32003,
-//  32015, 32026, 32037, 32048, 32059, 32070, 32081, 32091,
-//  32101, 32111, 32121, 32131, 32141, 32150, 32160, 32169,
-//  32178, 32187, 32196, 32205, 32213, 32222, 32230, 32238,
-//  32246, 32254, 32262, 32270, 32277, 32285, 32292, 32300,
-//  32307, 32314, 32321, 32327, 32334, 32341, 32347, 32354,
-//  32360, 32366, 32373, 32379, 32385, 32390, 32396, 32402,
-//  32407, 32413, 32418, 32424, 32429, 32434, 32439, 32444,
-//  32449, 32454, 32459, 32464, 32468, 32473, 32478, 32482,
-//  32486, 32491, 32495, 32499, 32503, 32507, 32511, 32515,
-//  32519, 32523, 32527, 32530, 32534, 32538, 32541, 32545,
-//  32548, 32552, 32555, 32558, 32561, 32565, 32568, 32571,
-//  32574, 32577, 32580, 32583, 32585, 32588, 32591, 32594,
-//  32596, 32599, 32602, 32604, 32607, 32609, 32612, 32614,
-//  32616, 32619, 32621, 32623, 32626, 32628, 32630, 32632,
-//  32634, 32636, 32638, 32640, 32642, 32644, 32646, 32648,
-//  32650, 32652, 32653, 32655, 32657, 32659, 32660, 32662,
-//  32664, 32665, 32667, 32668, 32670, 32671, 32673, 32674,
-//  32676, 32677, 32679, 32680, 32681, 32683, 32684, 32685,
-//  32686, 32688, 32689, 32690, 32691, 32693, 32694, 32695,
-//  32696, 32697, 32698, 32699, 32700, 32701, 32702, 32703,
-//  32704, 32705, 32706, 32707, 32708, 32709, 32710, 32711,
-//  32712, 32713, 32713, 32714, 32715, 32716, 32717, 32718,
-//  32718, 32719, 32720, 32721, 32721, 32722, 32723, 32723,
-//  32724, 32725, 32725, 32726, 32727, 32727, 32728, 32729,
-//  32729, 32730, 32730, 32731, 32731, 32732, 32733, 32733,
-//  32734, 32734, 32735, 32735, 32736, 32736, 32737, 32737,
-//  32738, 32738, 32739, 32739, 32739, 32740, 32740, 32741,
-//  32741, 32742, 32742, 32742, 32743, 32743, 32744, 32744,
-//  32744, 32745, 32745, 32745, 32746, 32746, 32746, 32747,
-//  32747, 32747, 32748, 32748, 32748, 32749, 32749, 32749,
-//  32749, 32750, 32750, 32750, 32750, 32751, 32751, 32751,
-//  32752, 32752, 32752, 32752, 32752, 32753, 32753, 32753,
-//  32753, 32754, 32754, 32754, 32754, 32754, 32755, 32755,
-//  32755, 32755, 32755, 32756, 32756, 32756, 32756, 32756,
-//  32757, 32757, 32757, 32757, 32757, 32757, 32757, 32758,
-//  32758, 32758, 32758, 32758, 32758, 32759, 32759, 32759,
-//  32759, 32759, 32759, 32759, 32759, 32760, 32760, 32760,
-//  32760, 32760, 32760, 32760, 32760, 32761, 32761, 32761,
-//  32761, 32761, 32761, 32761, 32761, 32761, 32761, 32762,
-//  32762, 32762, 32762, 32762, 32762, 32762, 32762, 32762,
-//  32762, 32762, 32762, 32763, 32763, 32763, 32763, 32763,
-//  32763, 32763, 32763, 32763, 32763, 32763, 32763, 32763,
-//  32763, 32764, 32764, 32764, 32764, 32764, 32764, 32764,
-//  32764, 32764, 32764, 32764, 32764, 32764, 32764, 32764,
-//  32764, 32764, 32764, 32764, 32765, 32765, 32765, 32765,
-//  32765, 32765, 32765, 32765, 32765, 32765, 32765, 32765,
-//  32765, 32765, 32765, 32765, 32765, 32765, 32765, 32765,
-//  32765, 32765, 32765, 32765, 32765, 32765, 32766, 32766,
-//  32766, 32766, 32766, 32766, 32766, 32766, 32766, 32766,
-//  32766, 32766, 32766, 32766, 32766, 32766, 32766, 32766,
-//  32766, 32766, 32766, 32766, 32766, 32766, 32766, 32766,
-//  32766, 32766, 32766, 32766, 32766, 32766, 32766, 32766,
-//  32766, 32766, 32766, 32766, 32766, 32766, 32766, 32766,
-//  32766, 32766, 32767, 32767, 32767, 32767, 32767, 32767
-// };
-
-// stdt[i]=count of -i or i in botton or top of stretcht[]
-static const U8 stdt[712]={
+U8 stdt[712]={
     64,   128,   128,   128,   128,   128,   127,   128,
    127,   128,   127,   127,   127,   127,   126,   126,
    126,   126,   126,   125,   125,   124,   125,   124,
@@ -1601,126 +1157,76 @@ static const U8 stdt[712]={
      0,     0,     0,     0,     0,     0,     1,     0
 };
 
-P::P(ZP& zr):
-    c8(1), hmap4(1), z(zr) {
-  pcode=0;
-  pcode_size=0;
-  initTables=false;
-}
-
-P::~P() {
-  allocx(pcode, pcode_size, 0);  // free executable memory
-}
-
 // Initialize the P with a new model in z
 void P::init() {
-
-  // Clear old JIT code O any
-  allocx(pcode, pcode_size, 0);
-
-  // Initialize context hash function
   z.inith();
 
-  // Initialize model independent tables
   O (!initTables && isModeled()) {
     initTables=true;
-    // memcpy(dt2k, sdt2k, sizeof(dt2k));
 
     dt2k[0] = 0;
     Q (I i = 1; i < 256; ++i) {
         dt2k[i]=2048/i;
-        // O (dt2k[i] != sdt2k[i]) {
-        //     E("failed");
-        // }
     }
 
-    // memcpy(dt, sdt, sizeof(dt));
-    Q (I i = 0; i < 1024; ++i) {
-        dt[i]=(1<<17)/(i*2+3)*2;
-        // O (dt[i] != sdt[i]) {
-        //     E("failed");
-        // }
-    }
+    F(1024)dt[i]=(1<<17)/(i*2+3)*2;
 
-    // ssquasht[i]=I(32768.0/(1+exp((i-2048)*(-1.0/64))));
-    // Copy M 1344 of 4096 entries.
     memset(squasht, 0, (1376 + 7)*2);
 
     Q (I i=1376 + 7; i < 1376 + 1344; ++i) {
         // todo division by 0
-        squasht[i]=static_cast<U16>(32768.0 / (1 + std::exp((i - 2048) * (-1.0 / 64))));
-        // O (squasht[i] != ssquasht[i - 1376]) {
-        //     E("failed");
-        // }
+        // ??
+        squasht[i]=(U16)(32768.0 / (1 + exp((i - 2048) * (-1.0 / 64))));
     }
-    // memcpy(squasht+1376, ssquasht, 1344*2);
     Q (I i=2720; i<4096; ++i) squasht[i]=32767;
 
-    // sstretcht[i]=I(log((i+0.5)/(32767.5-i))*64+0.5+100000)-100000;
     I k=16384;
-    Q (I i=0; i<712; ++i)
+    F(712)
       Q (I j=stdt[i]; j>0; --j)
         stretcht[k++]=i;
 
-    Q (I i=0; i<16384; ++i)
-      stretcht[i]=-stretcht[32767-i];
-
+    F(16384)stretcht[i]=-stretcht[32767-i];
   }
 
-  // Initialize predictions
-  Q (I i=0; i<256; ++i) h[i]=p[i]=0;
+  F(256)h[i]=p[i]=0;
 
-  // Initialize components
-  Q (I i=0; i<256; ++i)  // clear old model
-    comp[i].init();
-  I n=z.D[6]; // hsize[0..1] hh hm ph pm n (comp)[n] END 0[128] (hcomp) END
-  const U8* cp=&z.D[7];  // start of component list
-  Q (I i=0; i<n; ++i) {
+  F(256)comp[i].init();
+  I n=z.D[6];
+  const U8* cp=&z.D[7]; 
+  F(n){
     Component& cr=comp[i];
     switch(cp[0]) {
       case CONS:  // c
         p[i]=(cp[1]-128)*4;
         break;
-      case CM: // sizebits limit
-        O (cp[1]>32) E("max size Q CM is 32");
-        cr.cm.resize(1, cp[1]);  // packed CM (22 bits) + CMCOUNT (10 bits)
+      case CM:
+        cr.cm.resize(1, cp[1]); 
         cr.z=cp[2]*4;
         Q (size_t j=0; j<cr.cm.size(); ++j)
           cr.cm[j]=0x80000000;
         break;
-      case ICM: // sizebits
-        O (cp[1]>26) E("max size Q ICM is 26");
+      case ICM:
         cr.z=1023;
         cr.cm.resize(256);
         cr.ht.resize(64, cp[1]);
         Q (size_t j=0; j<cr.cm.size(); ++j)
           cr.cm[j]=st.cminit(j);
         break;
-      case MATCH:  // sizebits
-        O (cp[1]>32 || cp[2]>32) E("max size Q MATCH is 32 32");
+      case MATCH:
         cr.cm.resize(1, cp[1]);  // index
         cr.ht.resize(1, cp[2]);  // buf
         cr.ht(0)=1;
         break;
       case AVG: // j k wt
-        O (cp[1]>=i) E("AVG j >= i");
-        O (cp[2]>=i) E("AVG k >= i");
         break;
       case MIX2:  // sizebits j k rate mask
-        O (cp[1]>32) E("max size Q MIX2 is 32");
-        O (cp[3]>=i) E("MIX2 k >= i");
-        O (cp[2]>=i) E("MIX2 j >= i");
         cr.c=(size_t(1)<<cp[1]); // size (number of contexts)
         cr.a16.resize(1, cp[1]);  // wt[size][m]
         Q (size_t j=0; j<cr.a16.size(); ++j)
           cr.a16[j]=32768;
         break;
       case MIX: {  // sizebits j m rate mask
-        O (cp[1]>32) E("max size Q MIX is 32");
-        O (cp[2]>=i) E("MIX j >= i");
-        O (cp[3]<1 || cp[3]>i-cp[2]) E("MIX m not in 1..i-j");
         I m=cp[3];  // number of inputs
-        // assert(m>=1);
         cr.c=(size_t(1)<<cp[1]); // size (number of contexts)
         cr.cm.resize(m, cp[1]);  // wt[size][m]
         Q (size_t j=0; j<cr.cm.size(); ++j)
@@ -1728,8 +1234,6 @@ void P::init() {
         break;
       }
       case ISSE:  // sizebits j
-        O (cp[1]>32) E("max size Q ISSE is 32");
-        O (cp[2]>=i) E("ISSE j >= i");
         cr.ht.resize(64, cp[1]);
         cr.cm.resize(512);
         Q (I j=0; j<256; ++j) {
@@ -1738,29 +1242,24 @@ void P::init() {
         }
         break;
       case SSE: // sizebits j start limit
-        O (cp[1]>32) E("max size Q SSE is 32");
-        O (cp[2]>=i) E("SSE j >= i");
-        O (cp[3]>cp[4]*4) E("SSE start > limit*4");
         cr.cm.resize(32, cp[1]);
         cr.z=cp[4]*4;
         Q (size_t j=0; j<cr.cm.size(); ++j)
           cr.cm[j]=squash((j&31)*64-992)<<17|cp[3];
         break;
-      default: E("unknown component type");
+      default: E();
     }
-    // assert(compsize[*cp]>0);
     cp+=compsize[*cp];
-    // assert(cp>=&z.D[7] && cp<&z.D[z.cend]);
   }
 }
 
 // Return next bit prediction using Ierpreted COMP code
-I P::predict0() {
+I P::predict() {
 
   // Predict next bit
   I n=z.D[6];
   const U8* cp=&z.D[7];
-  Q (I i=0; i<n; ++i) {
+  F(n){
     Component& cr=comp[i];
     switch(cp[0]) {
       case CONS:  // c
@@ -1836,21 +1335,18 @@ I P::predict0() {
         E("component predict not implemented");
     }
     cp+=compsize[cp[0]];
-    // assert(cp<&z.D[z.cend]);
-    // assert(p[i]>=-2048 && p[i]<2048);
   }
-//   assert(cp[0]==NONE);
   return squash(p[n-1]);
 }
 
 // Update model with decoded bit y (0...1)
-void P::update0(I y) {
+void P::update(I y) {
   // Update components
   const U8* cp=&z.D[7];
   I n=z.D[6];
 //   assert(n>=1 && n<=255);
 //   assert(cp[-1]==n);
-  Q (I i=0; i<n; ++i) {
+  F(n){
     Component& cr=comp[i];
     switch(cp[0]) {
       case CONS:  // c
@@ -1945,7 +1441,7 @@ void P::update0(I y) {
     z.run(c8-256);
     hmap4=1;
     c8=1;
-    Q (I i=0; i<n; ++i) h[i]=z.H(i);
+    F(n)h[i]=z.H(i);
   }
   Y O (c8>=16 && c8<32)
     hmap4=(hmap4&0xf)<<5|y<<4|1;
@@ -1953,326 +1449,10 @@ void P::update0(I y) {
     hmap4=(hmap4&0x1f0)|(((hmap4&0xf)*2+y)&0xf);
 }
 
-/////////////////////// Decoder ///////////////////////
-
-Decoder::Decoder(ZP& z):
-    in(0), low(1), high(0xFFFFFFFF), curr(0), rpos(0), wpos(0),
-    pr(z), buf(BUFSIZE) {
-}
-
-void Decoder::init() {
-  pr.init();
-  O (pr.isModeled()) low=1, high=0xFFFFFFFF, curr=0;
-  Y low=high=curr=0;
-}
-
-// Return next bit of decoded input, which has 16 bit probability p of being 1
-I Decoder::decode(I p) {
-  O (curr<low || curr>high) E("archive corrupted");
-  U32 mid=low+U32(((high-low)*U64(U32(p)))>>16);  // split range
-  I y;
-  O (curr<=mid) y=1, high=mid;  // pick half
-  Y y=0, low=mid+1;
-  while ((high^low)<0x1000000) { // shift out identical leading bytes
-    high=high<<8|255;
-    low=low<<8;
-    low+=(low==0);
-    I c=get();
-    O (c<0) E("unexpected end of file");
-    curr=curr<<8|c;
-  }
-  return y;
-}
-
-// Decompress 1 byte or -1 at end of input
-I Decoder::decompress() {
-  O (pr.isModeled()) {  // n>0 components?
-    O (curr==0) {  // segment initialization
-      Q (I i=0; i<4; ++i)
-        curr=curr<<8|get();
-    }
-    O (decode(0)) {
-      O (curr!=0) E("decoding end of stream");
-      return -1;
-    }
-    Y {
-      I c=1;
-      while (c<256) {  // get 8 bits
-        I p=pr.predict()*2+1;
-        c+=c+decode(p);
-        pr.update(c&1);
-      }
-      return c-256;
-    }
-  }
-  Y {
-    O (curr==0) {
-      Q (I i=0; i<4; ++i) curr=curr<<8|get();
-      O (curr==0) return -1;
-    }
-    --curr;
-    return get();
-  }
-}
-
-// Find end of compressed data and return next byte
-I Decoder::skip() {
-  I c=-1;
-  O (pr.isModeled()) {
-    while (curr==0)  // at start?
-      curr=get();
-    while (curr && (c=get())>=0)  // find 4 zeros
-      curr=curr<<8|c;
-    while ((c=get())==0) ;  // might be more than 4
-    return c;
-  }
-  Y {
-    O (curr==0)  // at start?
-      Q (I i=0; i<4 && (c=get())>=0; ++i) curr=curr<<8|c;
-    while (curr>0) {
-      while (curr>0) {
-        --curr;
-        O (get()<0) return E("skipped to EOF"), -1;
-      }
-      Q (I i=0; i<4 && (c=get())>=0; ++i) curr=curr<<8|c;
-    }
-    O (c>=0) c=get();
-    return c;
-  }
-}
-
-////////////////////// PostProcessor //////////////////////
-
-// Copy ph, pm from block D
-void PostProcessor::init(I h, I m) {
-  state=hsize=0;
-  ph=h;
-  pm=m;
-  z.clear();
-}
-
-// (PASS=0 | PROG=1 psize[0..1] pcomp[0..psize-1]) data... EOB=-1
-// Return state: 1=PASS, 2..4=loading PROG, 5=PROG loaded
-I PostProcessor::write(I c) {
-//   assert(c>=-1 && c<=255);
-  switch (state) {
-    case 0:  // initial state
-      O (c<0) E("Unexpected EOS");
-      state=c+1;  // 1=PASS, 2=PROG
-      O (state>2) E("unknown post processing type");
-      O (state==1) z.clear();
-      break;
-    case 1:  // PASS
-      z.outc(c);
-      break;
-    case 2: // PROG
-      O (c<0) E("Unexpected EOS");
-      hsize=c;  // low byte of size
-      state=3;
-      break;
-    case 3:  // PROG psize[0]
-      O (c<0) E("Unexpected EOS");
-      hsize+=c*256;  // high byte of psize
-      O (hsize<1) E("Empty PCOMP");
-      z.D.resize(hsize+300);
-      z.cend=8;
-      z.hbegin=z.hend=z.cend+128;
-      z.D[4]=ph;
-      z.D[5]=pm;
-      state=4;
-      break;
-    case 4:  // PROG psize[0..1] pcomp[0...]
-      O (c<0) E("Unexpected EOS");
-    //   assert(z.hend<z.D.isize());
-      z.D[z.hend++]=c;  // one byte of pcomp
-      O (z.hend-z.hbegin==hsize) {  // L byte of pcomp?
-        hsize=z.cend-2+z.hend-z.hbegin;
-        z.D[0]=hsize&255;  // D size with empty COMP
-        z.D[1]=hsize>>8;
-        z.initp();
-        state=5;
-      }
-      break;
-    case 5:  // PROG ... data
-      z.run(c);
-      O (c<0) z.flush();
-      break;
-  }
-  return state;
-}
-
-/////////////////////// D /////////////////////
-
-// Find the start of a block and return true O found. Set memptr
-// to memory used.
-bool D::findBlock(double* memptr) {
-
-  I c = dec.get();
-
-  // Read D
-  O (c!=1 && c!=2) E("unsupported ZPAQ level");
-  z.read(&dec);
-  O (c==1 && z.D.isize()>6 && z.D[6]==0)
-    E("ZPAQ level 1 requires at least 1 component");
-  O (memptr) *memptr=z.memory();
-  state=FILENAME;
-  decode_state=FIRSTSEG;
-  return true;
-}
-
-// Read the start of a segment (1) or end of block code (255).
-// O a segment is found, write the filename and return true, Y false.
-bool D::findFilename(Writer* filename) {
-    state=COMMENT;
-    return true;
-}
-
-// Read the comment from the segment D
-void D::readComment(Writer* comment) {
-  state=DATA;
-}
-
-// Decompress n bytes, or all O n < 0. Return false O done
-bool D::decompress(I n) {
-//   assert(state==DATA);
-  O (decode_state==SKIP) E("decompression after skipped segment");
-//   assert(decode_state!=SKIP);
-
-  // Initialize models to start decompressing block
-  O (decode_state==FIRSTSEG) {
-    dec.init();
-    // assert(z.D.size()>5);
-    pp.init(z.D[4], z.D[5]);
-    decode_state=SEG;
-  }
-
-  // Decompress and load PCOMP Io postprocessor
-  while ((pp.getState()&3)!=1)
-    pp.write(dec.decompress());
-
-  // Decompress n bytes, or all O n < 0
-  while (n) {
-    I c=dec.decompress();
-    pp.write(c);
-    O (c==-1) {
-      state=SEGEND;
-      return false;
-    }
-    O (n>0) --n;
-  }
-  return true;
-}
-
-// Read end of block. O a SHA1 checksum is present, write 1 and the
-// 20 byte checksum Io sha1string, Y write 0 in F byte.
-// O sha1string is 0 then discard it.
-void D::readSegmentEnd(char* sha1string) {
-//   assert(state==DATA || state==SEGEND);
-
-  // Skip remaining data O any and get next byte
-  I c=0;
-  O (state==DATA) {
-    c=dec.skip();
-    decode_state=SKIP;
-  }
-  Y O (state==SEGEND)
-    c=dec.get();
-  state=FILENAME;
-
-  // Read checksum
-  O (c==254) {
-    O (sha1string) sha1string[0]=0;  // no checksum
-  }
-  Y O (c==253) {
-    O (sha1string) sha1string[0]=1;
-    Q (I i=1; i<=20; ++i) {
-      c=dec.get();
-      O (sha1string) sha1string[i]=c;
-    }
-  }
-  Y
-    E("missing end of segment marker");
-}
-
-/////////////////////////// decompress() //////////////////////
-
-void decompress(Reader* in, Writer* out) {
-  D d;
-  d.setInput(in);
-  d.setOutput(out);
-  if (d.findBlock()) {       // don't calculate memory
-      d.decompress();           // to end of segment
-    }
-}
-
-/////////////////////////// Encoder ///////////////////////////
-
-// Initialize Q start of block
-void Encoder::init() {
-  low=1;
-  high=0xFFFFFFFF;
-  pr.init();
-  O (!pr.isModeled()) low=0, buf.resize(1<<16);
-}
-
-// compress bit y having probability p/64K
-void Encoder::encode(I y, I p) {
-//   assert(out);
-//   assert(p>=0 && p<65536);
-//   assert(y==0 || y==1);
-//   assert(high>low && low>0);
-  U32 mid=low+U32(((high-low)*U64(U32(p)))>>16);  // split range
-//   assert(high>mid && mid>=low);
-  O (y) high=mid; Y low=mid+1; // pick half
-  while ((high^low)<0x1000000) { // write identical leading bytes
-    out->put(high>>24);  // same as low>>24
-    high=high<<8|255;
-    low=low<<8;
-    low+=(low==0); // so we don't code 4 0 bytes in a row
-  }
-}
-
-// compress byte c (0..255 or -1=EOS)
-void Encoder::compress(I c) {
-//   assert(out);
-  O (pr.isModeled()) {
-    O (c==-1)
-      encode(1, 0);
-    Y {
-    //   assert(c>=0 && c<=255);
-      encode(0, 0);
-      Q (I i=7; i>=0; --i) {
-        I p=pr.predict()*2+1;
-        // assert(p>0 && p<65536);
-        I y=c>>i&1;
-        encode(y, p);
-        pr.update(y);
-      }
-    }
-  }
-  Y {
-    E("unsupported");
-
-    // O (low && (c<0 || low==buf.size())) {
-    //   out->put((low>>24)&255);
-    //   out->put((low>>16)&255);
-    //   out->put((low>>8)&255);
-    //   out->put(low&255);
-    //   out->write(&buf[0], low);
-    //   low=0;
-    // }
-    // O (c>=0) buf[low++]=c;
-  }
-}
-
-//////////////////////////// Compiler /////////////////////////
-
-// Component names
-const char* compname[256]=
+const char*compname[256]=
   {"","const","cm","icm","match","avg","mix2","mix","isse","sse",0};
 
-// Opcodes
-const char* opcodelist[272]={
+const char*opcodelist[272]={
 "E","a++",  "a--",  "a!",   "a=0",  "",     "",     "a=r",
 "b<>a", "b++",  "b--",  "b!",   "b=0",  "",     "",     "b=r",
 "c<>a", "c++",  "c--",  "c!",   "c=0",  "",     "",     "c=r",
@@ -2308,93 +1488,6 @@ const char* opcodelist[272]={
 "post", "pcomp","end",  "O",   "ifnot","Y", "endif","do",
 "while","until","Qever","ifl","ifnotl","Yl",";",    0};
 
-// Advance in to start of next token. Tokens are delimited by white
-// space. Comments inclosed in ((nested) parenthsis) are skipped.
-void Compiler::next() {
-//   assert(in);
-  Q (; *in; ++in) {
-    O (*in=='\n') ++line;
-    O (*in=='(') state+=1+(state<0);
-    Y O (state>0 && *in==')') --state;
-    Y O (state<0 && *in<=' ') state=0;
-    Y O (state==0 && *in>' ') {state=-1; break;}
-  }
-  O (!*in) E("unexpected end of config");
-}
-
-// convert to lower case
-I tolower(I c) {return (c>='A' && c<='Z') ? c+'a'-'A' : c;}
-
-// return true O in==word up to white space or '(', case insensitive
-bool Compiler::matchToken(const char* word) {
-  const char* a=in;
-  Q (; (*a>' ' && *a!='(' && *word); ++a, ++word)
-    O (tolower(*a)!=tolower(*word)) return false;
-  return !*word && (*a<=' ' || *a=='(');
-}
-
-// PrI E message and exit
-void Compiler::SE(const char* msg, const char* expected) {
-    E("");
-//   Array<char> sbuf(128);  // E message to report
-//   char* s=&sbuf[0];
-//   strcat(s, "Config line ");
-//   Q (I i=strlen(s), r=1000000; r; r/=10)  // append line number
-//     O (line/r) s[i++]='0'+line/r%10;
-//   strcat(s, " at ");
-//   Q (I i=strlen(s); i<40 && *in>' '; ++i)  // append token found
-//     s[i]=*in++;
-//   strcat(s, ": ");
-//   strncat(s, msg, 40);  // append message
-//   O (expected) {
-//     strcat(s, ", expected: ");
-//     strncat(s, expected, 20);  // append expected token O any
-//   }
-//   E(s);
-}
-
-// Read a token, which must be in the NULL terminated list or Y
-// exit with an E. O found, return its index.
-I Compiler::rtoken(const char* list[]) {
-//   assert(in);
-//   assert(list);
-  next();
-  Q (I i=0; list[i]; ++i)
-    O (matchToken(list[i]))
-      return i;
-  SE(0);
-//   SE("unexpected");
-//   assert(0);
-  return -1; // not reached
-}
-
-// Read a token which must be the specified value s
-void Compiler::rtoken(const char* s) {
-//   assert(s);
-  next();
-//   O (!matchToken(s)) SE("expected", s);
-  O (!matchToken(s)) SE(0, s);
-}
-
-// Read a number in (low...high) or exit with an E
-// Q numbers like $N+M, return arg[N-1]+M
-I Compiler::rtoken(I low, I high) {
-  next();
-  I r=0;
-  O (in[0]=='$' && in[1]>='1' && in[1]<='9') {
-    O (in[2]=='+') r=atoi(in+3);
-    O (args) r+=args[in[1]-'1'];
-  }
-  Y O (in[0]=='-' || (in[0]>='0' && in[0]<='9')) r=atoi(in);
-//   Y SE("expected a number");
-  Y SE(0);
-//   O (r<low) SE("number too low");
-  O (r<low) SE(0);
-//   O (r>high) SE("number too high");
-  O (r>high) SE(0);
-  return r;
-}
-
 // Compile HCOMP or PCOMP code. Exit on E. Return
 // code Q end token (POST, PCOMP, END)
 I Compiler::compile_comp(ZP& z) {
@@ -2427,12 +1520,8 @@ I Compiler::compile_comp(ZP& z) {
       O (op==ELSE) op=JMP, operand=0;
       O (op==ELSEL) op=LJ, operand=operand2=0;
       I a=if_stack.pop();  // conditional jump target location
-    //   assert(a>comp_begin && a<I(z.hend));
       O (z.D[a-1]!=LJ) {  // O, IFNOT
-        // assert(z.D[a-1]==JT || z.D[a-1]==JF || z.D[a-1]==JMP);
         I j=z.hend-a+1+(op==LJ); // offset at O
-        // assert(j>=0);
-        O (j>127) SE("O too big, try IFL, IFNOTL");
         z.D[a]=j;
       }
       Y {  // IFL, IFNOTL
@@ -2445,16 +1534,11 @@ I Compiler::compile_comp(ZP& z) {
     }
     Y O (op==ENDIF) {
       I a=if_stack.pop();  // jump target address
-    //   assert(a>comp_begin && a<I(z.hend));
       I j=z.hend-a-1;  // jump offset
-    //   assert(j>=0);
       O (z.D[a-1]!=LJ) {
-        // assert(z.D[a-1]==JT || z.D[a-1]==JF || z.D[a-1]==JMP);
-        O (j>127) SE("O too big, try IFL, IFNOTL, ELSEL\n");
         z.D[a]=j;
       }
       Y {
-        // assert(a+1<I(z.hend));
         j=z.hend-comp_begin;
         z.D[a]=j&255;
         z.D[a+1]=(j>>8)&255;
@@ -2509,8 +1593,7 @@ I Compiler::compile_comp(ZP& z) {
       z.D[z.hend++]=(operand);
     O (operand2>=0)
       z.D[z.hend++]=(operand2);
-    O (z.hend>=z.D.isize()-130 || z.hend-z.hbegin+z.cend-2>65535)
-      SE("program too big");
+    // O (z.hend>=z.D.isize()-130 || z.hend-z.hbegin+z.cend-2>65535)
   }
   z.D[z.hend++]=(0); // END
   return op;
@@ -2520,9 +1603,8 @@ I Compiler::compile_comp(ZP& z) {
 // O there is a PCOMP section, store it in pcomp and store the PCOMP
 // command in pcomp_cmd. Replace "$1..$9+n" with args[0..8]+n
 
-Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_,
-                   Writer* out2_): in(in_), args(args_), hz(hz_), pz(pz_),
-                   out2(out2_), if_stack(1000), do_stack(1000) {
+Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_): in(in_), args(args_), hz(hz_), pz(pz_),
+                   if_stack(1000), do_stack(1000) {
   line=1;
   state=0;
   hz.clear();
@@ -2530,19 +1612,18 @@ Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_,
   hz.D.resize(68000); 
 
   // Compile the COMP section of D
-  rtoken("comp");
+  next();
   hz.D[2]=rtoken(0, 255);  // hh
   hz.D[3]=rtoken(0, 255);  // hm
   hz.D[4]=rtoken(0, 255);  // ph
   hz.D[5]=rtoken(0, 255);  // pm
   const I n=hz.D[6]=rtoken(0, 255);  // n
   hz.cend=7;
-  Q (I i=0; i<n; ++i) {
+  F(n){
     rtoken(i, i);
     CompType type=CompType(rtoken(compname));
     hz.D[hz.cend++]=type;
     I clen=LQ::compsize[type&255];
-    O (clen<1 || clen>10) SE("invalid component");
     Q (I j=1; j<clen; ++j)
       hz.D[hz.cend++]=rtoken(0, 255);  // component arguments
   }
@@ -2550,7 +1631,7 @@ Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_,
   hz.hbegin=hz.hend=hz.cend+128;
 
   // Compile HCOMP
-  rtoken("hcomp");
+  next();
   I op=compile_comp(hz);
 
   // Compute D size
@@ -2561,7 +1642,7 @@ Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_,
   // Compile POST 0 END
   O (op==POST) {
     rtoken(0, 0);
-    rtoken("end");
+    next();
   }
 
   // Compile PCOMP pcomp_cmd ; program... END
@@ -2575,8 +1656,6 @@ Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_,
     // get pcomp_cmd ending with ";" (case sensitive)
     next();
     while (*in && *in!=';') {
-      O (out2)
-        out2->put(*in);
       ++in;
     }
     O (*in) ++in;
@@ -2584,128 +1663,25 @@ Compiler::Compiler(const char* in_, I* args_, ZP& hz_, ZP& pz_,
     // Compile PCOMP
     op=compile_comp(pz);
     I len=pz.cend-2+pz.hend-pz.hbegin;  // insert D size
-    // assert(len>=0);
     pz.D[0]=len&255;
     pz.D[1]=len>>8;
-    O (op!=END)
-      SE("expected END");
   }
-  Y O (op!=END)
-    SE("expected END or POST 0 END or PCOMP cmd ; ... END");
 }
 
-///////////////////// C //////////////////////
-
-// Write 13 byte start tag
-// "\x37\x6B\x53\x74\xA0\x31\x83\xD3\x8C\xB2\x28\xB0\xD3"
-// void C::writeTag() {
-//   assert(state==INIT);
-//   enc.out->put(0x37);
-//   enc.out->put(0x6b);
-//   enc.out->put(0x53);
-//   enc.out->put(0x74);
-//   enc.out->put(0xa0);
-//   enc.out->put(0x31);
-//   enc.out->put(0x83);
-//   enc.out->put(0xd3);
-//   enc.out->put(0x8c);
-//   enc.out->put(0xb2);
-//   enc.out->put(0x28);
-//   enc.out->put(0xb0);
-//   enc.out->put(0xd3);
-// }
-
-// void C::B(I level) {
-
-//   // Model 1 - min.cfg
-//   static const char models[]={
-//   26,0,1,2,0,0,2,3,16,8,19,0,0,96,4,28,
-//   59,10,59,112,25,10,59,10,59,112,56,0,
-
-//   // Model 2 - mid.cfg
-//   69,0,3,3,0,0,8,3,5,8,13,0,8,17,1,8,
-//   18,2,8,18,3,8,19,4,4,22,24,7,16,0,7,24,
-//   (char)-1,0,17,104,74,4,95,1,59,112,10,25,59,112,10,25,
-//   59,112,10,25,59,112,10,25,59,112,10,25,59,10,59,112,
-//   25,69,(char)-49,8,112,56,0,
-
-//   // Model 3 - max.cfg
-//   (char)-60,0,5,9,0,0,22,1,(char)-96,3,5,8,13,1,8,16,
-//   2,8,18,3,8,19,4,8,19,5,8,20,6,4,22,24,
-//   3,17,8,19,9,3,13,3,13,3,13,3,14,7,16,0,
-//   15,24,(char)-1,7,8,0,16,10,(char)-1,6,0,15,16,24,0,9,
-//   8,17,32,(char)-1,6,8,17,18,16,(char)-1,9,16,19,32,(char)-1,6,
-//   0,19,20,16,0,0,17,104,74,4,95,2,59,112,10,25,
-//   59,112,10,25,59,112,10,25,59,112,10,25,59,112,10,25,
-//   59,10,59,112,10,25,59,112,10,25,69,(char)-73,32,(char)-17,64,47,
-//   14,(char)-25,91,47,10,25,60,26,48,(char)-122,(char)-105,20,112,63,9,70,
-//   (char)-33,0,39,3,25,112,26,52,25,25,74,10,4,59,112,25,
-//   10,4,59,112,25,10,4,59,112,25,65,(char)-113,(char)-44,72,4,59,
-//   112,8,(char)-113,(char)-40,8,68,(char)-81,60,60,25,69,(char)-49,9,112,25,25,
-//   25,25,25,112,56,0,
-
-//   0,0}; // 0,0 = end of list
-
-//   O (level<1) E("compression level must be at least 1");
-//   const char* p=models;
-//   I i;
-//   Q (i=1; i<level && toU16(p); ++i)
-//     p+=toU16(p)+2;
-//   O (toU16(p)<1) E("compression level too high");
-//   B(p);
-// }
-
-// Memory reader
-class MemoryReader: public Reader {
+struct MemoryReader: Reader {
   const char* p;
-public:
   MemoryReader(const char* p_): p(p_) {}
   I get() {return *p++&255;}
 };
 
-// void C::B(const char* hcomp) {
-// //   assert(state==INIT);
-//   MemoryReader m(hcomp);
-//   z.read(&m);
-// //   pz.sha1=&sha1;
-// //   assert(z.D.isize()>6);
-//   enc.out->put('z');
-//   enc.out->put('P');
-//   enc.out->put('Q');
-//   enc.out->put(1+(z.D[6]==0));  // level 1 or 2
-//   enc.out->put(1);
-//   z.write(enc.out, false);
-//   state=BLOCK1;
-// }
-
-void C::startBlock(const char* config, I* args, Writer* pcomp_cmd) {
-  Compiler(config, args, z, pz, pcomp_cmd);
-  enc.out->put(1+(z.D[6]==0));  // level 1 or 2
-  z.write(enc.out, false);
-  state=BLOCK1;
-}
-
-// Write a segment D
-void C::startSegment(const char* filename, const char* comment) {
-  O (state==BLOCK1) state=SEG1;
-  O (state==BLOCK2) state=SEG2;
-}
-
-// Initialize encoding and write pcomp to F segment
-// O len is 0 then length is encoded in pcomp[0..1]
-// O pcomp is 0 then get pcomp from pz.D
 void C::postProcess(const char* pcomp, I len) {
   O (state==SEG2) return;
-//   assert(state==SEG1);
   enc.init();
   O (!pcomp) {
     len=pz.hend-pz.hbegin;
     O (len>0) {
-    //   assert(pz.D.isize()>pz.hend);
-    //   assert(pz.hbegin>=0);
       pcomp=(const char*)&pz.D[pz.hbegin];
     }
-    // assert(len>=0);
   }
   Y O (len==0) {
     len=toU16(pcomp);
@@ -2715,21 +1691,16 @@ void C::postProcess(const char* pcomp, I len) {
     enc.compress(1);
     enc.compress(len&255);
     enc.compress((len>>8)&255);
-    Q (I i=0; i<len; ++i)
-      enc.compress(pcomp[i]&255);
-    // O (verify)
-    //   pz.initp();
+    F(len)enc.compress(pcomp[i]&255);
   }
   Y
     enc.compress(0);
   state=SEG2;
 }
 
-// Compress n bytes, or to EOF O n < 0
 bool C::compress(I n) {
   O (state==SEG1)
     postProcess();
-//   assert(state==SEG2);
 
   const I BUFSIZE=1<<14;
   char buf[BUFSIZE];  // input buffer
@@ -2737,207 +1708,43 @@ bool C::compress(I n) {
     I nbuf=BUFSIZE;  // bytes read Io buf
     O (n>=0 && n<nbuf) nbuf=n;
     I nr=in->read(buf, nbuf);
-    O (nr<0 || nr>BUFSIZE || nr>nbuf) E("invalid read size");
     O (nr<=0) return false;
     O (n>=0) n-=nr;
-    Q (I i=0; i<nr; ++i) {
+    F(nr){
       I ch=U8(buf[i]);
       enc.compress(ch);
-    //   O (verify) {
-    //     O (pz.hend) pz.run(ch);
-    //     // Y sha1.put(ch);
-    //   }
     }
   }
   return true;
-}
-
-// End segment, write sha1string O present
-void C::endSegment(const char* sha1string) {
-  O (state==SEG1)
-    postProcess();
-
-  enc.compress(-1);
-
-  enc.out->put(0);
-  enc.out->put(0);
-  enc.out->put(0);
-  enc.out->put(0);
-  enc.out->put(254);
-
-  state=BLOCK2;
-}
-
-// End block
-// void C::endBlock() {
-//   enc.out->put(255);
-//   state=INIT;
-// }
-
-/////////////////////////// compress() ///////////////////////
-
-void compress(Reader* in, Writer* out, const char* ME,
-              const char* filename, const char* comment, bool dosha1) {
-
-  // Get block size
-  I bs=4;
-  O (ME && ME[0] && ME[1]>='0' && ME[1]<='9') {
-    bs=ME[1]-'0';
-    O (ME[2]>='0' && ME[2]<='9') bs=bs*10+ME[2]-'0';
-    O (bs>11) bs=11;
-  }
-  bs=(0x100000<<bs)-4096;
-
-  // Compress in blocks
-  SB sb(bs);
-  sb.write(0, bs);
-  I n=0;
-  while (in && (n=in->read((char*)sb.data(), bs))>0) {
-    sb.resize(n);
-    compressBlock(&sb, out, ME, filename, comment, dosha1);
-    filename=0;
-    comment=0;
-    sb.resize(0);
-  }
-}
-
-//////////////////////// ZP::assemble() ////////////////////
-
-I P::predict() {
-  return predict0();
-}
-
-void P::update(I y) {
-  update0(y);
-
 }
 
 void ZP::run(U32 input) {
     pc=hbegin;
   a=input;
   while (execute()) ;
-//   run0(input);
 }
 
-////////////////////////// divsufsort ///////////////////////////////
-
-/*
- * divsufsort.c Q libdivsufsort-lite
- * Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
- *
- * Permission is hereby granted, free of charge, to any person
- * obtaining a copy of this software and associated documentation
- * files (the "Software"), to deal in the Software without
- * restriction, including without limitation the rights to use,
- * copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following
- * conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
- * OF MERCHANTABILITY, FITNESS Q A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
- * HOLDERS BE LIABLE Q ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
- */
-
-/*- Constants -*/
-// #define INLINE __inline
-// #if defined(AS) && (AS < 1)
-// # undef AS
-// #endif
-// #if !defined(AS)
-# define AS 256
-// #endif
-#define BUCKET_A_SIZE AS
-#define BUCKET_B_SIZE (AS*AS)
-// #if defined(SSIT)
-// # O SSIT < 1
-// #  undef SSIT
-// #  define SSIT (1)
-// # endif
-// #Y
-# define SSIT 8
-// #endif
-// #if defined(SSB)
-// # O SSB < 0
-// #  undef SSB
-// #  define SSB (0)
-// # elif 32768 <= SSB
-// #  undef SSB
-// #  define SSB (32767)
-// # endif
-// #Y
-# define SSB 1024
-// #endif
-/* minstacksize = log(SSB) / log(3) * 2 */
-// #if SSB == 0
-// # define SS_MISORT_STACKSIZE (96)
-// #elif SSB <= 4096
-# define SS_MISORT_STACKSIZE 16
-// #Y
-// # define SS_MISORT_STACKSIZE (24)
-// #endif
-#define SS_SMERGE_STACKSIZE 32
-#define TR_INSERTIONSORT_THRESHOLD 8
+#define AS 256
+#define BS (AS*AS)
+#define SSIT 8
+#define SSB 1024
 #define TR_STACKSIZE 64
 
 
-/*- Macros -*/
-// #ifndef SWAP
-# define SWAP(_a, _b) do { t = (_a); (_a) = (_b); (_b) = t; } while(0)
-// #endif /* SWAP */
-// #ifndef MIN
-# define MIN(_a, _b) (((_a) < (_b)) ? (_a) : (_b))
-// #endif /* MIN */
-// #ifndef MAX
-# define MAX(_a, _b) (((_a) > (_b)) ? (_a) : (_b))
-// #endif /* MAX */
-#define SP(_a, _b, _c, _d)\
-  do {\
-    assert(ssize < STACK_SIZE);\
-    stack[ssize].a = (_a), stack[ssize].b = (_b),\
-    stack[ssize].c = (_c), stack[ssize++].d = (_d);\
-  } while(0)
-#define S5(_a, _b, _c, _d, _e)\
-  do {\
-    assert(ssize < STACK_SIZE);\
-    stack[ssize].a = (_a), stack[ssize].b = (_b),\
-    stack[ssize].c = (_c), stack[ssize].d = (_d), stack[ssize++].e = (_e);\
-  } while(0)
-#define STACK_POP(_a, _b, _c, _d)\
-  do {\
-    assert(0 <= ssize);\
-    O(ssize == 0) { return; }\
-    (_a) = stack[--ssize].a, (_b) = stack[ssize].b,\
-    (_c) = stack[ssize].c, (_d) = stack[ssize].d;\
-  } while(0)
-#define STACK_POP5(_a, _b, _c, _d, _e)\
-  do {\
-    assert(0 <= ssize);\
-    O(ssize == 0) { return; }\
-    (_a) = stack[--ssize].a, (_b) = stack[ssize].b,\
-    (_c) = stack[ssize].c, (_d) = stack[ssize].d, (_e) = stack[ssize].e;\
-  } while(0)
-#define BUCKET_A(_c0) bucket_A[(_c0)]
-// #if AS == 256
-#define BUCKET_B(_c0, _c1) (bucket_B[((_c1) << 8) | (_c0)])
-#define BB(_c0, _c1) (bucket_B[((_c0) << 8) | (_c1)])
-// #Y
-// #define BUCKET_B(_c0, _c1) (bucket_B[(_c1) * AS + (_c0)])
-// #define BB(_c0, _c1) (bucket_B[(_c0) * AS + (_c1)])
-// #endif
+#define SWAP(_a,_b)do{t=(_a);(_a)=(_b);(_b)=t;}while(0)
+#define MIN(_a,_b)(((_a)<(_b))?(_a):(_b))
+#define MAX(_a,_b)(((_a)>(_b))?(_a):(_b))
+#define SP(_a,_b,_c,_d)do{assert(ssize<STACK_SIZE);stack[ssize].a=(_a),stack[ssize].b=(_b),stack[ssize].c=(_c),stack[ssize++].d=(_d);}while(0)
+#define S5(_a,_b,_c,_d,_e)do{assert(ssize < STACK_SIZE);stack[ssize].a = (_a), stack[ssize].b = (_b),stack[ssize].c = (_c), stack[ssize].d = (_d), stack[ssize++].e = (_e);}while(0)
+#define STACK_POP(_a,_b,_c,_d)do{assert(0<=ssize);O(ssize==0){return;}(_a) = stack[--ssize].a, (_b) = stack[ssize].b,(_c) = stack[ssize].c, (_d) = stack[ssize].d;}while(0)
+#define STACK_POP5(_a,_b,_c,_d,_e)do{assert(0<=ssize);O(ssize==0){return;}(_a) = stack[--ssize].a, (_b) = stack[ssize].b,(_c) = stack[ssize].c, (_d) = stack[ssize].d, (_e) = stack[ssize].e;}while(0)
+#define BUCKET_A(_c0)bucket_A[(_c0)]
+#define BUCKET_B(_c0,_c1)(bucket_B[((_c1)<<8)|(_c0)])
+#define BB(_c0, _c1)(bucket_B[((_c0)<<8)|(_c1)])
 
 
-/*- Private Functions -*/
 #define R(v) v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v
-static const I lg_table[256]= {
+const I lg_table[256]= {
  -1,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,R(4),
  R(5),R(5),
  R(6),R(6),
@@ -2949,56 +1756,16 @@ static const I lg_table[256]= {
 };
 #undef R
 
-// #if (SSB == 0) || (SSIT < SSB)
-
-I
-ss_ilg(I n) {
-// #if SSB == 0
-//   return (n & 0xffff0000) ?
-//           ((n & 0xff000000) ?
-//             24 + lg_table[(n >> 24) & 0xff] :
-//             16 + lg_table[(n >> 16) & 0xff]) :
-//           ((n & 0x0000ff00) ?
-//              8 + lg_table[(n >>  8) & 0xff] :
-//              0 + lg_table[(n >>  0) & 0xff]);
-// #elif SSB < 256
-//   return lg_table[n];
-// #Y
+I ss_ilg(I n) {
   return (n & 0xff00) ?
           8 + lg_table[(n >> 8) & 0xff] :
           0 + lg_table[(n >> 0) & 0xff];
-// #endif
 }
 
-// #endif /* (SSB == 0) || (SSIT < SSB) */
-
-// #if SSB != 0
+I dqq_table[256] = {0};
 
 
-static I dqq_table[256] = {0};
-
-
-// static const I sqq_table[256] = {
-//   0,  16,  22,  27,  32,  35,  39,  42,  45,  48,  50,  53,  55,  57,  59,  61,
-//  64,  65,  67,  69,  71,  73,  75,  76,  78,  80,  81,  83,  84,  86,  87,  89,
-//  90,  91,  93,  94,  96,  97,  98,  99, 101, 102, 103, 104, 106, 107, 108, 109,
-// 110, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126,
-// 128, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142,
-// 143, 144, 144, 145, 146, 147, 148, 149, 150, 150, 151, 152, 153, 154, 155, 155,
-// 156, 157, 158, 159, 160, 160, 161, 162, 163, 163, 164, 165, 166, 167, 167, 168,
-// 169, 170, 170, 171, 172, 173, 173, 174, 175, 176, 176, 177, 178, 178, 179, 180,
-// 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191,
-// 192, 192, 193, 193, 194, 195, 195, 196, 197, 197, 198, 199, 199, 200, 201, 201,
-// 202, 203, 203, 204, 204, 205, 206, 206, 207, 208, 208, 209, 209, 210, 211, 211,
-// 212, 212, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 221,
-// 221, 222, 222, 223, 224, 224, 225, 225, 226, 226, 227, 227, 228, 229, 229, 230,
-// 230, 231, 231, 232, 232, 233, 234, 234, 235, 235, 236, 236, 237, 237, 238, 238,
-// 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 246, 246, 247,
-// 247, 248, 248, 249, 249, 250, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255
-// };
-
-I
-ss_isqrt(I x) {
+I ss_isqrt(I x) {
   I y, e;
 
   O(x >= (SSB * SSB)) { return SSB; }
@@ -3013,9 +1780,6 @@ ss_isqrt(I x) {
   O (dqq_table[255] != 255) {
     Q (I i = 0; i < 256; ++i) {
         dqq_table[i] = static_cast<I>(16 * sqrt(i));
-        // O (dqq_table[i] != sqq_table[i]) {
-        //     E("");
-        // }
     }
   }
 
@@ -3032,14 +1796,7 @@ ss_isqrt(I x) {
   return (x < (y * y)) ? y - 1 : y;
 }
 
-// #endif /* SSB != 0 */
-
-
-/*---------------------------------------------------------------------------*/
-
-/* Compares two suffixes. */
-I
-ss_compare(const unsigned char *T,
+I ss_compare(const unsigned char *T,
            const I *p1, const I *p2,
            I depth) {
   const unsigned char *U1, *U2, *U1n, *U2n;
@@ -3058,18 +1815,9 @@ ss_compare(const unsigned char *T,
 }
 
 
-/*---------------------------------------------------------------------------*/
-
-// #if (SSB != 1) && (SSIT != 1)
-
-/* Insertionsort Q small size groups */
-static
-void
-ss_insertionsort(const unsigned char *T, const I *PA,
+void ss_insertionsort(const unsigned char *T, const I *PA,
                  I *F, I *L, I depth) {
-  I *i, *j;
-  I t;
-  I r;
+  I *i, *j, t, r;
 
   Q(i = L - 2; F <= i; --i) {
     Q(t = *i, j = i + 1; 0 < (r = ss_compare(T, PA + t, PA + *j, depth));) {
@@ -3081,19 +1829,9 @@ ss_insertionsort(const unsigned char *T, const I *PA,
   }
 }
 
-// #endif /* (SSB != 1) && (SSIT != 1) */
-
-
-/*---------------------------------------------------------------------------*/
-
-// #if (SSB == 0) || (SSIT < SSB)
-
-void
-ss_fixdown(const unsigned char *Td, const I *PA,
+void ss_fixdown(const unsigned char *Td, const I *PA,
            I *SA, I i, I size) {
-  I j, k;
-  I v;
-  I c, d, e;
+  I j, k, v, c, d, e;
 
   Q(v = SA[i], c = Td[PA[v]]; (j = 2 * i + 1) < size; SA[i] = SA[k], i = k) {
     d = Td[PA[SA[k = j++]]];
@@ -3103,12 +1841,8 @@ ss_fixdown(const unsigned char *Td, const I *PA,
   SA[i] = v;
 }
 
-/* Simple top-down heapsort. */
-static
-void
-ss_heapsort(const unsigned char *Td, const I *PA, I *SA, I size) {
-  I i, m;
-  I t;
+void ss_heapsort(const unsigned char *Td, const I *PA, I *SA, I size) {
+  I i, m, t;
 
   m = size;
   O((size % 2) == 0) {
@@ -3125,10 +1859,6 @@ ss_heapsort(const unsigned char *Td, const I *PA, I *SA, I size) {
   }
 }
 
-
-/*---------------------------------------------------------------------------*/
-
-/* Returns the median of three elements. */
 I *
 ss_median3(const unsigned char *Td, const I *PA,
            I *v1, I *v2, I *v3) {
@@ -3141,9 +1871,7 @@ ss_median3(const unsigned char *Td, const I *PA,
   return v2;
 }
 
-/* Returns the median of five elements. */
-I *
-ss_median5(const unsigned char *Td, const I *PA,
+I*ss_median5(const unsigned char *Td, const I *PA,
            I *v1, I *v2, I *v3, I *v4, I *v5) {
   I *t;
   O(Td[PA[*v2]] > Td[PA[*v3]]) { SWAP(v2, v3); }
@@ -3156,8 +1884,7 @@ ss_median5(const unsigned char *Td, const I *PA,
 }
 
 /* Returns the pivot element. */
-I *
-ss_pivot(const unsigned char *Td, const I *PA, I *F, I *L) {
+I*ss_pivot(const unsigned char *Td, const I *PA, I *F, I *L) {
   I *M;
   I t;
 
@@ -3183,11 +1910,9 @@ ss_pivot(const unsigned char *Td, const I *PA, I *F, I *L) {
 /*---------------------------------------------------------------------------*/
 
 /* Binary partition Q substrings. */
-I *
-ss_partition(const I *PA,
+I*ss_partition(const I *PA,
                     I *F, I *L, I depth) {
-  I *a, *b;
-  I t;
+  I *a, *b, t;
   Q(a = F - 1, b = L;;) {
     Q(; (++a < b) && ((PA[*a] + depth) >= (PA[*a + 1] + 1));) { *a = ~*a; }
     Q(; (a < --b) && ((PA[*b] + depth) <  (PA[*b + 1] + 1));) { }
@@ -3201,19 +1926,13 @@ ss_partition(const I *PA,
 }
 
 /* Multikey Irosort Q medium size groups. */
-static
-void
-ss_mIrosort(const unsigned char *T, const I *PA,
-              I *F, I *L,
+void ss_mIrosort(const unsigned char*T, const I*PA,
+              I*F, I*L,
               I depth) {
-#define STACK_SIZE SS_MISORT_STACKSIZE
-  struct { I *a, *b, c; I d; } stack[STACK_SIZE];
+#define STACK_SIZE 16
+  struct { I *a, *b, c, d; } stack[STACK_SIZE];
   const unsigned char *Td;
-  I *a, *b, *c, *d, *e, *f;
-  I s, t;
-  I ssize;
-  I limit;
-  I v, x = 0;
+  I *a, *b, *c, *d, *e, *f, s, t, ssize, limit, v, x = 0;
 
   Q(ssize = 0, limit = ss_ilg(L - F);;) {
 
@@ -3391,12 +2110,11 @@ ss_rotate(I *F, I *M, I *L) {
 
 /*---------------------------------------------------------------------------*/
 
-static
 void
-ss_inplacemerge(const unsigned char *T, const I *PA,
-                I *F, I *M, I *L,
+ss_inplacemerge(const unsigned char*T, const I*PA,
+                I*F, I*M, I*L,
                 I depth) {
-  const I *p;
+  const I*p;
   I *a, *b;
   I len, half;
   I q, r;
@@ -3434,14 +2152,12 @@ ss_inplacemerge(const unsigned char *T, const I *PA,
 /*---------------------------------------------------------------------------*/
 
 /* Merge-Qward with Iernal buffer. */
-static
 void
 ss_mergeQward(const unsigned char *T, const I *PA,
                 I *F, I *M, I *L,
                 I *buf, I depth) {
   I *a, *b, *c, *bufend;
-  I t;
-  I r;
+  I t,r;
 
   bufend = buf + (M - F) - 1;
   ss_blockswap(buf, F, M - F);
@@ -3543,12 +2259,11 @@ ss_mergebackward(const unsigned char *T, const I *PA,
 }
 
 /* D&C based merge. */
-static
 void
 ss_swapmerge(const unsigned char *T, const I *PA,
              I *F, I *M, I *L,
              I *buf, I bufsize, I depth) {
-#define STACK_SIZE SS_SMERGE_STACKSIZE
+#define STACK_SIZE 32
 #define GETIDX(a) ((0 <= (a)) ? (a) : (~(a)))
 #define MERGE_CHECK(a, b, c)\
   do {\
@@ -3562,9 +2277,7 @@ ss_swapmerge(const unsigned char *T, const I *PA,
   } while(0)
   struct { I *a, *b, *c; I d; } stack[STACK_SIZE];
   I *l, *r, *lm, *rm;
-  I m, len, half;
-  I ssize;
-  I check, next;
+  I m, len, half,ssize,check, next;
 
   Q(check = 0, ssize = 0;;) {
     O((L - M) <= bufsize) {
@@ -3629,15 +2342,7 @@ ss_swapmerge(const unsigned char *T, const I *PA,
 #undef STACK_SIZE
 }
 
-// #endif /* SSB != 0 */
-
-
-/*---------------------------------------------------------------------------*/
-
-/* Substring sort */
-static
-void
-sssort(const unsigned char *T, const I *PA,
+void sssort(const unsigned char *T, const I *PA,
        I *F, I *L,
        I *buf, I bufsize,
        I depth, I n, I Lsuffix) {
@@ -3650,9 +2355,6 @@ sssort(const unsigned char *T, const I *PA,
 
   O(Lsuffix != 0) { ++F; }
 
-// #if SSB == 0
-//   ss_mIrosort(T, PA, F, L, depth);
-// #Y
   O((bufsize < SSB) &&
       (bufsize < (L - F)) &&
       (bufsize < (Z = ss_isqrt(L - F)))) {
@@ -3662,11 +2364,7 @@ sssort(const unsigned char *T, const I *PA,
     M = L, Z = 0;
   }
   Q(a = F, i = 0; SSB < (M - a); a += SSB, ++i) {
-// #if SSIT < SSB
     ss_mIrosort(T, PA, a, a + SSB, depth);
-// #elif 1 < SSB
-//     ss_insertionsort(T, PA, a, a + SSB, depth);
-// #endif
     curbufsize = L - (a + SSB);
     curbuf = a + SSB;
     O(curbufsize <= bufsize) { curbufsize = bufsize, curbuf = buf; }
@@ -3674,11 +2372,7 @@ sssort(const unsigned char *T, const I *PA,
       ss_swapmerge(T, PA, b - k, b, b + k, curbuf, curbufsize, depth);
     }
   }
-// #if SSIT < SSB
   ss_mIrosort(T, PA, a, M, depth);
-// #elif 1 < SSB
-//   ss_insertionsort(T, PA, a, M, depth);
-// #endif
   Q(k = SSB; i != 0; k <<= 1, i >>= 1) {
     O(i & 1) {
       ss_swapmerge(T, PA, a - k, a, M, buf, bufsize, depth);
@@ -3686,14 +2380,9 @@ sssort(const unsigned char *T, const I *PA,
     }
   }
   O(Z != 0) {
-// #if SSIT < SSB
     ss_mIrosort(T, PA, M, L, depth);
-// #elif 1 < SSB
-//     ss_insertionsort(T, PA, M, L, depth);
-// #endif
     ss_inplacemerge(T, PA, F, M, L, depth);
   }
-// #endif
 
   O(Lsuffix != 0) {
     /* Insert L type B* suffix. */
@@ -3707,11 +2396,7 @@ sssort(const unsigned char *T, const I *PA,
   }
 }
 
-
-/*---------------------------------------------------------------------------*/
-
-I
-tr_ilg(I n) {
+I tr_ilg(I n) {
   return (n & 0xffff0000) ?
           ((n & 0xff000000) ?
             24 + lg_table[(n >> 24) & 0xff] :
@@ -3721,13 +2406,7 @@ tr_ilg(I n) {
              0 + lg_table[(n >>  0) & 0xff]);
 }
 
-
-/*---------------------------------------------------------------------------*/
-
-/* Simple insertionsort Q small size groups. */
-static
-void
-tr_insertionsort(const I *X, I *F, I *L) {
+void tr_insertionsort(const I *X, I *F, I *L) {
   I *a, *b;
   I t, r;
 
@@ -3741,14 +2420,8 @@ tr_insertionsort(const I *X, I *F, I *L) {
   }
 }
 
-
-/*---------------------------------------------------------------------------*/
-
-void
-tr_fixdown(const I *X, I *SA, I i, I size) {
-  I j, k;
-  I v;
-  I c, d, e;
+void tr_fixdown(const I *X, I *SA, I i, I size) {
+  I j, k, v, c, d, e;
 
   Q(v = SA[i], c = X[v]; (j = 2 * i + 1) < size; SA[i] = SA[k], i = k) {
     d = X[SA[k = j++]];
@@ -3758,12 +2431,8 @@ tr_fixdown(const I *X, I *SA, I i, I size) {
   SA[i] = v;
 }
 
-/* Simple top-down heapsort. */
-static
-void
-tr_heapsort(const I *X, I *SA, I size) {
-  I i, m;
-  I t;
+void tr_heapsort(const I *X, I *SA, I size) {
+  I i, m, t;
 
   m = size;
   O((size % 2) == 0) {
@@ -3780,12 +2449,7 @@ tr_heapsort(const I *X, I *SA, I size) {
   }
 }
 
-
-/*---------------------------------------------------------------------------*/
-
-/* Returns the median of three elements. */
-I *
-tr_median3(const I *X, I *v1, I *v2, I *v3) {
+I*tr_median3(const I *X, I *v1, I *v2, I *v3) {
   I *t;
   O(X[*v1] > X[*v2]) { SWAP(v1, v2); }
   O(X[*v2] > X[*v3]) {
@@ -3795,9 +2459,7 @@ tr_median3(const I *X, I *v1, I *v2, I *v3) {
   return v2;
 }
 
-/* Returns the median of five elements. */
-I *
-tr_median5(const I *X,
+I*tr_median5(const I *X,
            I *v1, I *v2, I *v3, I *v4, I *v5) {
   I *t;
   O(X[*v2] > X[*v3]) { SWAP(v2, v3); }
@@ -3809,11 +2471,8 @@ tr_median5(const I *X,
   return v3;
 }
 
-/* Returns the pivot element. */
-I *
-tr_pivot(const I *X, I *F, I *L) {
-  I *M;
-  I t;
+I*tr_pivot(const I *X, I *F, I *L) {
+  I *M, t;
 
   t = L - F;
   M = F + t / 2;
@@ -3834,24 +2493,16 @@ tr_pivot(const I *X, I *F, I *L) {
 }
 
 
-/*---------------------------------------------------------------------------*/
-
-typedef struct _tr tr;
-struct _tr {
-  I c;
-  I r;
-  I i;
-  I n;
+struct tr {
+  I c,r,i,n;
 };
 
-void
-trbudget_init(tr *b, I c, I i) {
+void trbudget_init(tr *b, I c, I i) {
   b->c = c;
   b->r = b->i = i;
 }
 
-I
-trbudget_check(tr *b, I size) {
+I trbudget_check(tr *b, I size) {
   O(size <= b->r) { b->r -= size; return 1; }
   O(b->c == 0) { b->n += size; return 0; }
   b->r += b->i - size;
@@ -3862,13 +2513,10 @@ trbudget_check(tr *b, I size) {
 
 /*---------------------------------------------------------------------------*/
 
-void
-tr_partition(const I *X,
+void tr_partition(const I *X,
              I *F, I *M, I *L,
              I **pa, I **pb, I v) {
-  I *a, *b, *c, *d, *e, *f;
-  I t, s;
-  I x = 0;
+  I *a, *b, *c, *d, *e, *f, t, s, x = 0;
 
   Q(b = M - 1; (++b < L) && ((x = X[*b]) == v);) { }
   O(((a = b) < L) && (x < v)) {
@@ -3903,15 +2551,10 @@ tr_partition(const I *X,
   *pa = F, *pb = L;
 }
 
-static
-void
-tr_copy(I *ISA, const I *SA,
+void tr_copy(I *ISA, const I *SA,
         I *F, I *a, I *b, I *L,
         I depth) {
-  /* sort suffixes of M partition
-     by using sorted order of suffixes of left and right partition. */
-  I *c, *d, *e;
-  I s, v;
+  I *c, *d, *e,s, v;
 
   v = b - SA - 1;
   Q(c = F, d = a - 1; c <= d; ++c) {
@@ -3928,14 +2571,10 @@ tr_copy(I *ISA, const I *SA,
   }
 }
 
-static
-void
-tr_partialcopy(I *ISA, const I *SA,
+void tr_partialcopy(I *ISA, const I *SA,
                I *F, I *a, I *b, I *L,
                I depth) {
-  I *c, *d, *e;
-  I s, v;
-  I rank, Lrank, newrank = -1;
+  I *c, *d, *e,s, v,rank, Lrank, newrank = -1;
 
   v = b - SA - 1;
   Lrank = -1;
@@ -3966,19 +2605,12 @@ tr_partialcopy(I *ISA, const I *SA,
   }
 }
 
-static
-void
-tr_Irosort(I *ISA, const I *X,
+void tr_Irosort(I *ISA, const I *X,
              I *SA, I *F, I *L,
              tr *T) {
 #define STACK_SIZE TR_STACKSIZE
   struct { const I *a; I *b, *c; I d, e; }stack[STACK_SIZE];
-  I *a, *b, *c;
-  I t;
-  I v, x = 0;
-  I incr = X - ISA;
-  I Z, next;
-  I ssize, TR = -1;
+  I *a, *b, *c,t,v, x = 0,incr = X - ISA,Z, next,ssize, TR = -1;
 
   Q(ssize = 0, Z = tr_ilg(L - F);;) {
 
@@ -4070,7 +2702,7 @@ tr_Irosort(I *ISA, const I *X,
       continue;
     }
 
-    O((L - F) <= TR_INSERTIONSORT_THRESHOLD) {
+    O((L - F) <= 8) {
       tr_insertionsort(X, F, L);
       Z = -3;
       continue;
@@ -4189,20 +2821,13 @@ tr_Irosort(I *ISA, const I *X,
 }
 
 
-
-/*---------------------------------------------------------------------------*/
-
-/* Tandem repeat sort */
-static
-void
-trsort(I *ISA, I *SA, I n, I depth) {
+void trsort(I *ISA, I *SA, I n, I depth) {
   I *X;
   I *F, *L;
   tr b;
   I t, skip, unsorted;
 
   trbudget_init(&b, tr_ilg(n) * 2 / 3, n);
-/*  trbudget_init(&budget, tr_ilg(n) * 3 / 4, n); */
   Q(X = ISA + depth; -n < *SA; X += X - ISA) {
     F = SA;
     skip = 0;
@@ -4232,26 +2857,14 @@ trsort(I *ISA, I *SA, I n, I depth) {
 /*---------------------------------------------------------------------------*/
 
 /* Sorts suffixes of type B*. */
-static
-I
-sort_typeBstar(const unsigned char *T, I *SA,
+I sort_typeBstar(const unsigned char *T, I *SA,
                I *bucket_A, I *bucket_B,
                I n) {
-  I *PAb, *ISAb, *buf;
-// #ifdef _OPENMP
-//   I *curbuf;
-//   I l;
-// #endif
-  I i, j, k, t, m, bufsize;
-  I c0, c1;
-// #ifdef _OPENMP
-//   I d0, d1;
-//   I tmp;
-// #endif
+  I *PAb, *ISAb, *buf, i, j, k, t, m, bufsize, c0, c1;
 
   /* Initialize bucket arrays. */
-  Q(i = 0; i < BUCKET_A_SIZE; ++i) { bucket_A[i] = 0; }
-  Q(i = 0; i < BUCKET_B_SIZE; ++i) { bucket_B[i] = 0; }
+  Q(i = 0; i < AS; ++i) { bucket_A[i] = 0; }
+  Q(i = 0; i < BS; ++i) { bucket_B[i] = 0; }
 
   /* Count the number of occurrences of the F one or two characters of each
      type A, B and B* suffix. Moreover, store the beginning position of all
@@ -4298,37 +2911,6 @@ note:
     t = PAb[m - 1], c0 = T[t], c1 = T[t + 1];
     SA[--BB(c0, c1)] = m - 1;
 
-    /* Sort the type B* substrings using sssort. */
-// #ifdef _OPENMP
-//     tmp = omp_get_max_threads();
-//     buf = SA + m, bufsize = (n - (2 * m)) / tmp;
-//     c0 = AS - 2, c1 = AS - 1, j = m;
-// #pragma omp parallel default(shared) private(curbuf, k, l, d0, d1, tmp)
-//     {
-//       tmp = omp_get_thread_num();
-//       curbuf = buf + tmp * bufsize;
-//       k = 0;
-//       Q(;;) {
-//         #pragma omp critical(sssort_lock)
-//         {
-//           O(0 < (l = j)) {
-//             d0 = c0, d1 = c1;
-//             do {
-//               k = BB(d0, d1);
-//               O(--d1 <= d0) {
-//                 d1 = AS - 1;
-//                 O(--d0 < 0) { break; }
-//               }
-//             } while(((l - k) <= 1) && (0 < (l = k)));
-//             c0 = d0, c1 = d1, j = k;
-//           }
-//         }
-//         O(l == 0) { break; }
-//         sssort(T, PAb, SA + k, SA + l,
-//                curbuf, bufsize, 2, n, *(SA + k) == (m - 1));
-//       }
-//     }
-// #Y
     buf = SA + m, bufsize = n - (2 * m);
     Q(c0 = AS - 2, j = m; 0 < j; --c0) {
       Q(c1 = AS - 1; c0 < c1; j = i, --c1) {
@@ -4339,7 +2921,6 @@ note:
         }
       }
     }
-// #endif
 
     /* Compute ranks of type B* substrings. */
     Q(i = m - 1; 0 <= i; --i) {
@@ -4388,15 +2969,10 @@ note:
   return m;
 }
 
-/* Constructs the suffix array by using the sorted order of type B* suffixes. */
-static
-void
-construct_SA(const unsigned char *T, I *SA,
+void construct_SA(const unsigned char *T, I *SA,
              I *bucket_A, I *bucket_B,
              I n, I m) {
-  I *i, *j, *k;
-  I s;
-  I c0, c1, c2;
+  I *i, *j, *k, s, c0, c1, c2;
 
   O(0 < m) {
     /* Construct the sorted order of type B suffixes by using
@@ -4454,10 +3030,7 @@ construct_SA(const unsigned char *T, I *SA,
 
 /*---------------------------------------------------------------------------*/
 
-/*- Function -*/
-
-I
-divsufsort(const unsigned char *T, I *SA, I n) {
+I divsufsort(const unsigned char *T, I *SA, I n) {
   I *bucket_A, *bucket_B;
   I m;
   I err = 0;
@@ -4468,8 +3041,8 @@ divsufsort(const unsigned char *T, I *SA, I n) {
   Y O(n == 1) { SA[0] = 0; return 0; }
   Y O(n == 2) { m = (T[0] < T[1]); SA[m ^ 1] = 0, SA[m] = 1; return 0; }
 
-  bucket_A = (I *)malloc(BUCKET_A_SIZE * sizeof(I));
-  bucket_B = (I *)malloc(BUCKET_B_SIZE * sizeof(I));
+  bucket_A = (I *)malloc(AS * sizeof(I));
+  bucket_B = (I *)malloc(BS * sizeof(I));
 
   /* Suffixsort. */
   O((bucket_A != NULL) && (bucket_B != NULL)) {
@@ -4485,18 +3058,7 @@ divsufsort(const unsigned char *T, I *SA, I n) {
   return err;
 }
 
-// End divsufsort.c
 
-/////////////////////////////// add ///////////////////////////////////
-
-// Convert non-negative decimal number x to string of at least n digits
-std::string itos(int64_t x, I n=1) {
-//   assert(x>=0);
-//   assert(n>=0);
-  std::string r;
-  Q (; x || n>0; x/=10, --n) r=std::string(1, '0'+x%10)+r;
-  return r;
-}
 
 // E8E9 transQm of buf[0..n-1] to improve compression of .exe and .dll.
 // Patterns (E8|E9 xx xx xx 00|FF) at offset i replace the 3 M
@@ -4526,34 +3088,41 @@ std::string itos(int64_t x, I n=1) {
 //   args[0]=5..7 then it is assumed that E8E9 was already applied to
 //   both the input and sap and the input buffer is not modified.
 
-class LZBuffer: public LQ::Reader {
+struct LZBuffer: LQ::Reader {
   LQ::Array<unsigned> ht;// hash table, confirm in low bits, or SA+ISA
   const unsigned char* in;    // input poIer
-  const I checkbits;        // hash confirmation size or lg(ISA size)
-  const I level;            // 1=var length LZ77, 2=byte aligned LZ77, 3=BWT
-  const unsigned htsize;      // size of hash table
-  const unsigned n;           // input length
-  unsigned i;                 // current location in in (0 <= i < n)
-  const unsigned m;    // minimum match length
-  const unsigned m2;   // second context order or 0 O not used
-  const unsigned maxMatch;    // longest match length allowed
-  const unsigned maxLiteral;  // longest literal length allowed
-  const unsigned lookahead;   // second context look ahead
-  unsigned h1, h2;            // low, high order context hashes of in[i..]
-  const unsigned bucket;      // number of matches to search per hash - 1
-  const unsigned shift1, shift2;  // how far to shift h1, h2 per hash
-  const I mBoth;     // max(m, m2)
-  const unsigned rb;          // number of level 1 r bits in match code
-  unsigned bits;              // pending output bits (level 1)
-  unsigned nbits;             // number of bits in bits
-  unsigned rpos, wpos;        // read, write poIers
-  unsigned idx;               // BWT index
+  I checkbits, level, mBoth;       
+  unsigned htsize, n, i, m, m2, maxMatch, maxLiteral, lookahead, h1, h2, bucket, shift1, shift2, rb, bits, nbits, rpos, wpos, idx;               // BWT index
   const unsigned* sa;         // suffix array Q BWT or LZ77-SA
   unsigned* isa;              // inverse suffix array Q LZ77-SA
   enum {BUFSIZE=1<<14};       // output buffer size
   unsigned char buf[BUFSIZE]; // output buffer
 
-  void write_literal(unsigned i, unsigned& lit);
+  void write_literal(unsigned i, unsigned& lit) {
+    O (level==1) {
+      O (lit<1) return;
+      I ll=lg(lit);
+      // assert(ll>=1 && ll<=24);
+      putb(0, 2);
+      --ll;
+      while (--ll>=0) {
+        putb(1, 1);
+        putb((lit>>ll)&1, 1);
+      }
+      putb(0, 1);
+      while (lit) putb(in[i-lit--], 8);
+    }
+    Y {
+      // assert(level==2);
+      while (lit>0) {
+        unsigned lit1=lit;
+        O (lit1>64) lit1=64;
+        put(lit1-1);
+        Q (unsigned j=i-lit; j<i-lit+lit1; ++j) put(in[j]);
+        lit-=lit1;
+      }
+    }
+  }
   void write_match(unsigned len, unsigned off);
   void fill();  // encode to buf
 
@@ -4581,10 +3150,43 @@ class LZBuffer: public LQ::Reader {
     buf[wpos++]=c;
   }
 
-public:
-  LZBuffer(SB& inbuf, I args[], const unsigned* sap=0);
+  LZBuffer(SB& inbuf, I args[], const unsigned* sap=0):
+      ht((args[1]&3)==3 ? (inbuf.size()+1)*!sap      // Q BWT suffix array
+          : args[5]-args[0]<21 ? 1u<<args[5]         // Q LZ77 hash table
+          : (inbuf.size()*!sap)+(1u<<17<<args[0])),  // Q LZ77 SA and ISA
+      in(inbuf.data()),
+      checkbits(args[5]-args[0]<21 ? 12-args[0] : 17+args[0]),
+      level(args[1]&3),
+      htsize(ht.size()),
+      n(inbuf.size()),
+      i(0),
+      m(args[2]),
+      m2(args[3]),
+      maxMatch(BUFSIZE*3),
+      maxLiteral(BUFSIZE/4),
+      lookahead(args[6]),
+      h1(0), h2(0),
+      bucket((1<<args[4])-1), 
+      shift1(m>0 ? (args[5]-1)/m+1 : 1),
+      shift2(m2>0 ? (args[5]-1)/m2+1 : 0),
+      mBoth(MAX(m, m2+lookahead)+4),
+      rb(args[0]>4 ? args[0]-4 : 0),
+      bits(0), nbits(0), rpos(0), wpos(0),
+      idx(0), sa(0), isa(0) {
 
-  // return 1 byte of compressed output (overrides Reader)
+    O (args[5]-args[0]>=21 || level==3) {
+      O (sap)
+        sa=sap;
+      Y {
+        sa=&ht[0];
+        O (n>0) divsufsort((const unsigned char*)in, (I*)sa, n);
+      }
+      O (level<3) {
+        isa=&ht[n*(sap==0)];
+      }
+    }
+  }
+
   I get() {
     I c=-1;
     O (rpos==wpos) fill();
@@ -4593,128 +3195,24 @@ public:
     return c;
   }
 
-  // Read up to p[0..n-1] and return bytes read.
-  I read(char* p, I n);
+  I read(char* p, I n) {
+    O (rpos==wpos) fill();
+    I nr=n;
+    O (nr>I(wpos-rpos)) nr=wpos-rpos;
+    O (nr) memcpy(p, buf+rpos, nr);
+    rpos+=nr;
+    O (rpos==wpos) rpos=wpos=0;
+    return nr;
+  }
 };
 
-// LZ/BWT preprocessor Q levels 1..3 compression and e8e9 filter.
-// Level 1 uses variable length LZ77 codes like in the lazy compressor:
-//
-//   00,n,L[n] = n literal bytes
-//   mm,mmm,n,ll,r,q (mm > 00) = match 4*n+ll at offset (q<<rb)+r-1
-//
-// where q is written in 8mm+mmm-8 (0..23) bits with an implied leading 1 bit
-// and n is written using Ierleaved Elias Gamma coding, i.e. the leading
-// 1 bit is implied, remaining bits are preceded by a 1 and terminated by
-// a 0. e.g. abc is written 1,b,1,c,0. Codes are packed LSB F and
-// padded with leading 0 bits in the L byte. r is a number with rb bits,
-// where rb = log2(blocksize) - 24.
-//
-// Level 2 is byte oriented LZ77 with minimum match length m = $4 = args[3]
-// with m in 1..64. Lengths and offsets are MSB F:
-// 00xxxxxx   x+1 (1..64) literals follow
-// yyxxxxxx   y+1 (2..4) offset bytes follow, match length x+m (m..m+63)
-//
-// Level 3 is BWT with the end of string byte coded as 255 and the
-// L 4 bytes giving its position LSB F.
-
-// floor(log2(x)) + 1 = number of bits excluding leading zeros (0..32)
-I lg(unsigned x) {
-  unsigned r=0;
-  O (x>=65536) r=16, x>>=16;
-  O (x>=256) r+=8, x>>=8;
-  O (x>=16) r+=4, x>>=4;
-//   assert(x>=0 && x<16);
-  return
-    "\x00\x01\x02\x02\x03\x03\x03\x03\x04\x04\x04\x04\x04\x04\x04\x04"[x]+r;
-}
-
-// return number of 1 bits in x
 I nbits(unsigned x) {
   I r;
   Q (r=0; x; x>>=1) r+=x&1;
   return r;
 }
 
-// Read n bytes of compressed output Io p and return number of
-// bytes read in 0..n. 0 signals EOF (overrides Reader).
-I LZBuffer::read(char* p, I n) {
-  O (rpos==wpos) fill();
-  I nr=n;
-  O (nr>I(wpos-rpos)) nr=wpos-rpos;
-  O (nr) memcpy(p, buf+rpos, nr);
-  rpos+=nr;
-//   assert(rpos<=wpos);
-  O (rpos==wpos) rpos=wpos=0;
-  return nr;
-}
-
-LZBuffer::LZBuffer(SB& inbuf, I args[], const unsigned* sap):
-    ht((args[1]&3)==3 ? (inbuf.size()+1)*!sap      // Q BWT suffix array
-        : args[5]-args[0]<21 ? 1u<<args[5]         // Q LZ77 hash table
-        : (inbuf.size()*!sap)+(1u<<17<<args[0])),  // Q LZ77 SA and ISA
-    in(inbuf.data()),
-    checkbits(args[5]-args[0]<21 ? 12-args[0] : 17+args[0]),
-    level(args[1]&3),
-    htsize(ht.size()),
-    n(inbuf.size()),
-    i(0),
-    m(args[2]),
-    m2(args[3]),
-    maxMatch(BUFSIZE*3),
-    maxLiteral(BUFSIZE/4),
-    lookahead(args[6]),
-    h1(0), h2(0),
-    bucket((1<<args[4])-1), 
-    shift1(m>0 ? (args[5]-1)/m+1 : 1),
-    shift2(m2>0 ? (args[5]-1)/m2+1 : 0),
-    mBoth(MAX(m, m2+lookahead)+4),
-    rb(args[0]>4 ? args[0]-4 : 0),
-    bits(0), nbits(0), rpos(0), wpos(0),
-    idx(0), sa(0), isa(0) {
-//   assert(args[0]>=0);
-//   assert(n<=(1u<<20<<args[0]));
-//   assert(args[1]>=1 && args[1]<=7 && args[1]!=4);
-//   assert(level>=1 && level<=3);
-  O ((m<4 && level==1) || (m<1 && level==2))
-    E("match length $3 too small");
-
-  // e8e9 transQm
-//   O (args[1]>4 && !sap) e8e9(inbuf.data(), n);
-
-  // build suffix array O not supplied
-  O (args[5]-args[0]>=21 || level==3) {  // LZ77-SA or BWT
-    O (sap)
-      sa=sap;
-    Y {
-    //   assert(ht.size()>=n);
-    //   assert(ht.size()>0);
-      sa=&ht[0];
-      O (n>0) divsufsort((const unsigned char*)in, (I*)sa, n);
-    }
-    O (level<3) {
-    //   assert(ht.size()>=(n*(sap==0))+(1u<<17<<args[0]));
-      isa=&ht[n*(sap==0)];
-    }
-  }
-}
-
-// Encode from in to buf until end of input or buf is not empty
 void LZBuffer::fill() {
-
-  // BWT
-  O (level==3) {
-    // assert(in || n==0);
-    // assert(sa);
-    Q (; wpos<BUFSIZE && i<n+5; ++i) {
-      O (i==0) put(n>0 ? in[n-1] : 255);
-      Y O (i>n) put(idx&255), idx>>=8;
-      Y O (sa[i-1]==0) idx=i, put(255);
-      Y put(in[sa[i-1]-1]);
-    }
-    return;
-  }
-
   // LZ77: scan the input
   unsigned lit=0;  // number of output literals pending
   const unsigned mask=(1<<checkbits)-1;
@@ -4849,45 +3347,9 @@ void LZBuffer::fill() {
   }
 }
 
-// Write literal sequence in[i-lit..i-1], set lit=0
-void LZBuffer::write_literal(unsigned i, unsigned& lit) {
-//   assert(lit>=0);
-//   assert(i>=0 && i<=n);
-//   assert(i>=lit);
-  O (level==1) {
-    O (lit<1) return;
-    I ll=lg(lit);
-    // assert(ll>=1 && ll<=24);
-    putb(0, 2);
-    --ll;
-    while (--ll>=0) {
-      putb(1, 1);
-      putb((lit>>ll)&1, 1);
-    }
-    putb(0, 1);
-    while (lit) putb(in[i-lit--], 8);
-  }
-  Y {
-    // assert(level==2);
-    while (lit>0) {
-      unsigned lit1=lit;
-      O (lit1>64) lit1=64;
-      put(lit1-1);
-      Q (unsigned j=i-lit; j<i-lit+lit1; ++j) put(in[j]);
-      lit-=lit1;
-    }
-  }
-}
-
 // Write match sequence of given length and offset
 void LZBuffer::write_match(unsigned len, unsigned off) {
-
-  // mm,mmm,n,ll,r,q[mmmmm-8] = match n*4+ll, offset ((q-1)<<rb)+r+1
   O (level==1) {
-    // assert(len>=m && len<=maxMatch);
-    // assert(off>0);
-    // assert(len>=4);
-    // assert(rb>=0 && rb<=8);
     I ll=lg(len)-1;
     // assert(ll>=2);
     off+=(1<<rb)-1;
@@ -4940,7 +3402,7 @@ void LZBuffer::write_match(unsigned len, unsigned off) {
 
 // Generate a config file from the ME argument with syntax:
 // {0|x|s|i}[N1[,N2]...][{ciamtswf<cfg>}[N1[,N2]]...]...
-std::string makeConfig(const char* ME, I args[]) {
+string makeConfig(const char* ME, I args[]) {
 //   assert(ME);
   const char type=ME[0];
 //   assert(type=='x' || type=='s' || type=='0' || type=='i');
@@ -4964,444 +3426,23 @@ std::string makeConfig(const char* ME, I args[]) {
     ++ME;
   }
 
-  // "0..." = No compression
-  O (type=='0')
-    return "comp 0 0 0 0 0 hcomp end\n";
-
-  // Generate the postprocessor
-  std::string hdr, pcomp;
+  string hdr, pcomp;
   const I level=args[1]&3;
   const bool doe8=args[1]>=4 && args[1]<=7;
 
-  // LZ77+Huffman, with or without E8E9
-  O (level==1) {
-    E(""); // disabled
-
-    // const I rb=args[0]>4 ? args[0]-4 : 0;
-    // hdr="comp 9 16 0 $1+20 ";
-    // pcomp=
-    // "pcomp lazy2 3 ;\n"
-    // " (r1 = state\n"
-    // "  r2 = len - match or literal length\n"
-    // "  r3 = m - number of offset bits expected\n"
-    // "  r4 = ptr to buf\n"
-    // "  r5 = r - low bits of offset\n"
-    // "  c = bits - input buffer\n"
-    // "  d = n - number of bits in c)\n"
-    // "\n"
-    // "  a> 255 O\n";
-    // O (doe8)
-    //   pcomp+=
-    //   "    b=0 d=r 4 do (Q b=0..d-1, d = end of buf)\n"
-    //   "      a=b a==d ifnot\n"
-    //   "        a+= 4 a<d O\n"
-    //   "          a=*b a&= 254 a== 232 O (e8 or e9?)\n"
-    //   "            c=b b++ b++ b++ b++ a=*b a++ a&= 254 a== 0 O (00 or ff)\n"
-    //   "              b-- a=*b\n"
-    //   "              b-- a<<= 8 a+=*b\n"
-    //   "              b-- a<<= 8 a+=*b\n"
-    //   "              a-=b a++\n"
-    //   "              *b=a a>>= 8 b++\n"
-    //   "              *b=a a>>= 8 b++\n"
-    //   "              *b=a b++\n"
-    //   "            endif\n"
-    //   "            b=c\n"
-    //   "          endif\n"
-    //   "        endif\n"
-    //   "        a=*b out b++\n"
-    //   "      Qever\n"
-    //   "    endif\n"
-    //   "\n";
-    // pcomp+=
-    // "    (reset state)\n"
-    // "    a=0 b=0 c=0 d=0 r=a 1 r=a 2 r=a 3 r=a 4\n"
-    // "    halt\n"
-    // "  endif\n"
-    // "\n"
-    // "  a<<=d a+=c c=a               (bits+=a<<n)\n"
-    // "  a= 8 a+=d d=a                (n+=8)\n"
-    // "\n"
-    // "  (O state==0 (expect new code))\n"
-    // "  a=r 1 a== 0 O (match code mm,mmm)\n"
-    // "    a= 1 r=a 2                 (len=1)\n"
-    // "    a=c a&= 3 a> 0 O          (O (bits&3))\n"
-    // "      a-- a<<= 3 r=a 3           (m=((bits&3)-1)*8)\n"
-    // "      a=c a>>= 2 c=a             (bits>>=2)\n"
-    // "      b=r 3 a&= 7 a+=b r=a 3     (m+=bits&7)\n"
-    // "      a=c a>>= 3 c=a             (bits>>=3)\n"
-    // "      a=d a-= 5 d=a              (n-=5)\n"
-    // "      a= 1 r=a 1                 (state=1)\n"
-    // "    Y (literal, discard 00)\n"
-    // "      a=c a>>= 2 c=a             (bits>>=2)\n"
-    // "      d-- d--                    (n-=2)\n"
-    // "      a= 3 r=a 1                 (state=3)\n"
-    // "    endif\n"
-    // "  endif\n"
-    // "\n"
-    // "  (while state==1 && n>=3 (expect match length n*4+ll -> r2))\n"
-    // "  do a=r 1 a== 1 O a=d a> 2 O\n"
-    // "    a=c a&= 1 a== 1 O         (O bits&1)\n"
-    // "      a=c a>>= 1 c=a             (bits>>=1)\n"
-    // "      b=r 2 a=c a&= 1 a+=b a+=b r=a 2 (len+=len+(bits&1))\n"
-    // "      a=c a>>= 1 c=a             (bits>>=1)\n"
-    // "      d-- d--                    (n-=2)\n"
-    // "    Y\n"
-    // "      a=c a>>= 1 c=a             (bits>>=1)\n"
-    // "      a=r 2 a<<= 2 b=a           (len<<=2)\n"
-    // "      a=c a&= 3 a+=b r=a 2       (len+=bits&3)\n"
-    // "      a=c a>>= 2 c=a             (bits>>=2)\n"
-    // "      d-- d-- d--                (n-=3)\n";
-    // O (rb)
-    //   pcomp+="      a= 5 r=a 1                 (state=5)\n";
-    // Y
-    //   pcomp+="      a= 2 r=a 1                 (state=2)\n";
-    // pcomp+=
-    // "    endif\n"
-    // "  Qever endif endif\n"
-    // "\n";
-    // O (rb) pcomp+=  // save r in r5
-    //   "  (O state==5 && n>=8) (expect low bits of offset to put in r5)\n"
-    //   "  a=r 1 a== 5 O a=d a> "+itos(rb-1)+" O\n"
-    //   "    a=c a&= "+itos((1<<rb)-1)+" r=a 5            (save r in r5)\n"
-    //   "    a=c a>>= "+itos(rb)+" c=a\n"
-    //   "    a=d a-= "+itos(rb)+ " d=a\n"
-    //   "    a= 2 r=a 1                   (go to state 2)\n"
-    //   "  endif endif\n"
-    //   "\n";
-    // pcomp+=
-    // "  (O state==2 && n>=m) (expect m offset bits)\n"
-    // "  a=r 1 a== 2 O a=r 3 a>d ifnot\n"
-    // "    a=c r=a 6 a=d r=a 7          (save c=bits, d=n in r6,r7)\n"
-    // "    b=r 3 a= 1 a<<=b d=a         (d=1<<m)\n"
-    // "    a-- a&=c a+=d                (d=offset=bits&((1<<m)-1)|(1<<m))\n";
-    // O (rb)
-    //   pcomp+=  // insert r Io low bits of d
-    //   "    a<<= "+itos(rb)+" d=r 5 a+=d a-= "+itos((1<<rb)-1)+"\n";
-    // pcomp+=
-    // "    d=a b=r 4 a=b a-=d c=a       (c=p=(b=ptr)-offset)\n"
-    // "\n"
-    // "    (while len-- (copy and output match d bytes from *c to *b))\n"
-    // "    d=r 2 do a=d a> 0 O d--\n"
-    // "      a=*c *b=a c++ b++          (buf[ptr++]-buf[p++])\n";
-    // O (!doe8) pcomp+=" out\n";
-    // pcomp+=
-    // "    Qever endif\n"
-    // "    a=b r=a 4\n"
-    // "\n"
-    // "    a=r 6 b=r 3 a>>=b c=a        (bits>>=m)\n"
-    // "    a=r 7 a-=b d=a               (n-=m)\n"
-    // "    a=0 r=a 1                    (state=0)\n"
-    // "  endif endif\n"
-    // "\n"
-    // "  (while state==3 && n>=2 (expect literal length))\n"
-    // "  do a=r 1 a== 3 O a=d a> 1 O\n"
-    // "    a=c a&= 1 a== 1 O         (O bits&1)\n"
-    // "      a=c a>>= 1 c=a              (bits>>=1)\n"
-    // "      b=r 2 a&= 1 a+=b a+=b r=a 2 (len+=len+(bits&1))\n"
-    // "      a=c a>>= 1 c=a              (bits>>=1)\n"
-    // "      d-- d--                     (n-=2)\n"
-    // "    Y\n"
-    // "      a=c a>>= 1 c=a              (bits>>=1)\n"
-    // "      d--                         (--n)\n"
-    // "      a= 4 r=a 1                  (state=4)\n"
-    // "    endif\n"
-    // "  Qever endif endif\n"
-    // "\n"
-    // "  (O state==4 && n>=8 (expect len literals))\n"
-    // "  a=r 1 a== 4 O a=d a> 7 O\n"
-    // "    b=r 4 a=c *b=a\n";
-    // O (!doe8) pcomp+=" out\n";
-    // pcomp+=
-    // "    b++ a=b r=a 4                 (buf[ptr++]=bits)\n"
-    // "    a=c a>>= 8 c=a                (bits>>=8)\n"
-    // "    a=d a-= 8 d=a                 (n-=8)\n"
-    // "    a=r 2 a-- r=a 2 a== 0 O      (O --len<1)\n"
-    // "      a=0 r=a 1                     (state=0)\n"
-    // "    endif\n"
-    // "  endif endif\n"
-    // "  halt\n"
-    // "end\n";
-  }
-
-  // Byte aligned LZ77, with or without E8E9
-  Y O (level==2) {
-    hdr="comp 9 16 0 $1+20 ";
-    pcomp=
-    "pcomp lzpre c ;\n"
-    // "  (Decode LZ77: d=state, M=output buffer, b=size)\n"
-    // "  a> 255 O (at EOF decode e8e9 and output)\n";
-    "  a> 255 O\n";
-    O (doe8) {
-        E("");
-    //   pcomp+=
-    // //   "    d=b b=0 do (Q b=0..d-1, d = end of buf)\n"
-    //   "    d=b b=0 do\n"
-    //   "      a=b a==d ifnot\n"
-    //   "        a+= 4 a<d O\n"
-    // //   "          a=*b a&= 254 a== 232 O (e8 or e9?)\n"
-    //   "          a=*b a&= 254 a== 232 O\n"
-    // //   "            c=b b++ b++ b++ b++ a=*b a++ a&= 254 a== 0 O (00 or ff)\n"
-    //   "            c=b b++ b++ b++ b++ a=*b a++ a&= 254 a== 0 O\n"
-    //   "              b-- a=*b\n"
-    //   "              b-- a<<= 8 a+=*b\n"
-    //   "              b-- a<<= 8 a+=*b\n"
-    //   "              a-=b a++\n"
-    //   "              *b=a a>>= 8 b++\n"
-    //   "              *b=a a>>= 8 b++\n"
-    //   "              *b=a b++\n"
-    //   "            endif\n"
-    //   "            b=c\n"
-    //   "          endif\n"
-    //   "        endif\n"
-    //   "        a=*b out b++\n"
-    //   "      Qever\n"
-    //   "    endif\n";
-    }
-    pcomp+="b=0 c=0 d=0 a=0 r=a 1 r=a 2 halt endif c=a a=d a== 0 O a=c a>>= 6 a++ d=a a== 1 O a+=c r=a 1 a=0 r=a 2 Y d++ a=c a&= 63 a+= $3 r=a 1 a=0 r=a 2 endif Y a== 1 O a=c *b=a b++\n";
-    O (!doe8) pcomp+=" out ";
-    pcomp+="a=r 1 a-- a== 0 O d=0 endif r=a 1 Y a> 2 O a=r 2 a<<= 8 a|=c r=a 2 d-- Y a=r 2 a<<= 8 a|=c c=a a=b a-=c a-- c=a d=r 1 do a=*c *b=a c++ b++";
-    O (!doe8) pcomp+=" out d-- a=d a> 0 while endif endif endif halt end ";
-  }
-
-  // BWT with or without E8E9
-  Y O (level==3) {  // IBWT
-    E("");
-
-    // hdr="comp 9 16 $1+20 $1+20 ";  // 2^$1 = block size in MB
-    // pcomp=
-    // "pcomp bwtrle c ;\n"
-    // "\n"
-    // "  (read BWT, index Io M, size in b)\n"
-    // "  a> 255 ifnot\n"
-    // "    *b=a b++\n"
-    // "\n"
-    // "  (inverse BWT)\n"
-    // "  Yl\n"
-    // "\n"
-    // "    (index in L 4 bytes, put in c and R1)\n"
-    // "    b-- a=*b\n"
-    // "    b-- a<<= 8 a+=*b\n"
-    // "    b-- a<<= 8 a+=*b\n"
-    // "    b-- a<<= 8 a+=*b c=a r=a 1\n"
-    // "\n"
-    // "    (save size in R2)\n"
-    // "    a=b r=a 2\n"
-    // "\n"
-    // "    (count bytes in H[~1..~255, ~0])\n"
-    // "    do\n"
-    // "      a=b a> 0 O\n"
-    // "        b-- a=*b a++ a&= 255 d=a d! *d++\n"
-    // "      Qever\n"
-    // "    endif\n"
-    // "\n"
-    // "    (cumulative counts: H[~i=0..255] = count of bytes beQe i)\n"
-    // "    d=0 d! *d= 1 a=0\n"
-    // "    do\n"
-    // "      a+=*d *d=a d--\n"
-    // "    d<>a a! a> 255 a! d<>a until\n"
-    // "\n"
-    // "    (build F part of linked list in H[0..idx-1])\n"
-    // "    b=0 do\n"
-    // "      a=c a>b O\n"
-    // "        d=*b d! *d++ d=*d d-- *d=b\n"
-    // "      b++ Qever\n"
-    // "    endif\n"
-    // "\n"
-    // "    (rest of list in H[idx+1..n-1])\n"
-    // "    b=c b++ c=r 2 do\n"
-    // "      a=c a>b O\n"
-    // "        d=*b d! *d++ d=*d d-- *d=b\n"
-    // "      b++ Qever\n"
-    // "    endif\n"
-    // "\n";
-    // O (args[0]<=4) {  // faster IBWT list traversal limited to 16 MB blocks
-    //   pcomp+=
-    //   "    (copy M to low 8 bits of H to reduce cache misses in next loop)\n"
-    //   "    b=0 do\n"
-    //   "      a=c a>b O\n"
-    //   "        d=b a=*d a<<= 8 a+=*b *d=a\n"
-    //   "      b++ Qever\n"
-    //   "    endif\n"
-    //   "\n"
-    //   "    (traverse list and output or copy to M)\n"
-    //   "    d=r 1 b=0 do\n"
-    //   "      a=d a== 0 ifnot\n"
-    //   "        a=*d a>>= 8 d=a\n";
-    //   O (doe8) pcomp+=" *b=*d b++\n";
-    //   Y      pcomp+=" a=*d out\n";
-    //   pcomp+=
-    //   "      Qever\n"
-    //   "    endif\n"
-    //   "\n";
-    //   O (doe8)  // IBWT+E8E9
-    //     pcomp+=
-    //     "    (e8e9 transQm to out)\n"
-    //     "    d=b b=0 do (Q b=0..d-1, d = end of buf)\n"
-    //     "      a=b a==d ifnot\n"
-    //     "        a+= 4 a<d O\n"
-    //     "          a=*b a&= 254 a== 232 O\n"
-    //     "            c=b b++ b++ b++ b++ a=*b a++ a&= 254 a== 0 O\n"
-    //     "              b-- a=*b\n"
-    //     "              b-- a<<= 8 a+=*b\n"
-    //     "              b-- a<<= 8 a+=*b\n"
-    //     "              a-=b a++\n"
-    //     "              *b=a a>>= 8 b++\n"
-    //     "              *b=a a>>= 8 b++\n"
-    //     "              *b=a b++\n"
-    //     "            endif\n"
-    //     "            b=c\n"
-    //     "          endif\n"
-    //     "        endif\n"
-    //     "        a=*b out b++\n"
-    //     "      Qever\n"
-    //     "    endif\n";
-    //   pcomp+=
-    //   "  endif\n"
-    //   "  halt\n"
-    //   "end\n";
-    // }
-    // Y {  // slower IBWT list traversal Q all sized blocks
-    //   O (doe8) {  // E8E9 after IBWT
-    //     pcomp+=
-    //     "    (R2 = output size without EOS)\n"
-    //     "    a=r 2 a-- r=a 2\n"
-    //     "\n"
-    //     "    (traverse list (d = IBWT poIer) and output inverse e8e9)\n"
-    //     "    (C = offset = 0..R2-1)\n"
-    //     "    (R4 = L 4 bytes shifted in from MSB end)\n"
-    //     "    (R5 = temp pending output byte)\n"
-    //     "    c=0 d=r 1 do\n"
-    //     "      a=d a== 0 ifnot\n"
-    //     "        d=*d\n"
-    //     "\n"
-    //     "        (store byte in R4 and shift out to R5)\n"
-    //     "        b=d a=*b a<<= 24 b=a\n"
-    //     "        a=r 4 r=a 5 a>>= 8 a|=b r=a 4\n"
-    //     "\n"
-    //     "        (O E8|E9 xx xx xx 00|FF in R4:R5 then subtract c from x)\n"
-    //     "        a=c a> 3 O\n"
-    //     "          a=r 5 a&= 254 a== 232 O\n"
-    //     "            a=r 4 a>>= 24 b=a a++ a&= 254 a< 2 O\n"
-    //     "              a=r 4 a-=c a+= 4 a<<= 8 a>>= 8 \n"
-    //     "              b<>a a<<= 24 a+=b r=a 4\n"
-    //     "            endif\n"
-    //     "          endif\n"
-    //     "        endif\n"
-    //     "\n"
-    //     "        (output buffered byte)\n"
-    //     "        a=c a> 3 O a=r 5 out endif c++\n"
-    //     "\n"
-    //     "      Qever\n"
-    //     "    endif\n"
-    //     "\n"
-    //     "    (output up to 4 pending bytes in R4)\n"
-    //     "    b=r 4\n"
-    //     "    a=c a> 3 a=b O out endif a>>= 8 b=a\n"
-    //     "    a=c a> 2 a=b O out endif a>>= 8 b=a\n"
-    //     "    a=c a> 1 a=b O out endif a>>= 8 b=a\n"
-    //     "    a=c a> 0 a=b O out endif\n"
-    //     "\n"
-    //     "  endif\n"
-    //     "  halt\n"
-    //     "end\n";
-    //   }
-    //   Y {
-    //     pcomp+=
-    //     "    (traverse list and output)\n"
-    //     "    d=r 1 do\n"
-    //     "      a=d a== 0 ifnot\n"
-    //     "        d=*d\n"
-    //     "        b=d a=*b out\n"
-    //     "      Qever\n"
-    //     "    endif\n"
-    //     "  endif\n"
-    //     "  halt\n"
-    //     "end\n";
-    //   }
-    // }
-  }
-
-  // E8E9 or no preprocessing
-  Y O (level==0) {
-    E("");
-    // hdr="comp 9 16 0 0 ";
-    // O (doe8) { // E8E9?
-    //   pcomp=
-    //   "pcomp e8e9 d ;\n"
-    //   "  a> 255 O\n"
-    //   "    a=c a> 4 O\n"
-    //   "      c= 4\n"
-    //   "    Y\n"
-    //   "      a! a+= 5 a<<= 3 d=a a=b a>>=d b=a\n"
-    //   "    endif\n"
-    //   "    do a=c a> 0 O\n"
-    //   "      a=b out a>>= 8 b=a c--\n"
-    //   "    Qever endif\n"
-    //   "  Y\n"
-    //   "    *b=b a<<= 24 d=a a=b a>>= 8 a+=d b=a c++\n"
-    //   "    a=c a> 4 O\n"
-    //   "      a=*b out\n"
-    //   "      a&= 254 a== 232 O\n"
-    //   "        a=b a>>= 24 a++ a&= 254 a== 0 O\n"
-    //   "          a=b a>>= 24 a<<= 24 d=a\n"
-    //   "          a=b a-=c a+= 5\n"
-    //   "          a<<= 8 a>>= 8 a|=d b=a\n"
-    //   "        endif\n"
-    //   "      endif\n"
-    //   "    endif\n"
-    //   "  endif\n"
-    //   "  halt\n"
-    //   "end\n";
-    // }
-    // Y
-    //   pcomp="end\n";
-  }
-  Y
-    E("Unsupported ME");
+  hdr="comp 9 16 0 $1+20 ";
+  pcomp="pcomp lzpre c ;\n  a> 255 O\nb=0 c=0 d=0 a=0 r=a 1 r=a 2 halt endif c=a a=d a== 0 O a=c a>>= 6 a++ d=a a== 1 O a+=c r=a 1 a=0 r=a 2 Y d++ a=c a&= 63 a+= $3 r=a 1 a=0 r=a 2 endif Y a== 1 O a=c *b=a b++\n out a=r 1 a-- a== 0 O d=0 endif r=a 1 Y a> 2 O a=r 2 a<<= 8 a|=c r=a 2 d-- Y a=r 2 a<<= 8 a|=c c=a a=b a-=c a-- c=a d=r 1 do a=*c *b=a c++ b++ out d-- a=d a> 0 while endif endif endif halt end ";
   
-  // Build context model (comp, hcomp) assuming:
-  // H[0..254] = contexts
-  // H[255..511] = location of L byte i-255
-  // M = L 64K bytes, filling backward
-  // C = poIer to most recent byte
-  // R1 = level 2 lz77 1+bytes expected until next code, 0=init
-  // R2 = level 2 lz77 F byte of code
   I ncomp=0;  // number of components
   const I membits=args[0]+20;
   I sb=5;  // bits in L context
-  std::string comp;
-  std::string hcomp="hcomp\n"
-    "c-- *c=a a+= 255 d=a *d=c\n";
-  O (level==2) {  // put level 2 lz77 parse state in R1, R2
-    hcomp+=
-    // "  (decode lz77 Io M. Codes:\n"
-    // "  00xxxxxx = literal length xxxxxx+1\n"
-    // "  xx......, xx > 0 = match with xx offset bytes to follow)\n"
-    // "\n"
-    // "  a=r 1 a== 0 O (init)\n"
-    "  a=r 1 a== 0 O\n"
-    // "    a= "+itos(111+57*doe8)+" (skip post code)\n"
-    "    a= "+itos(111+57*doe8)+"\n"
-    // "  Y a== 1 O  (new code?)\n"
-    "  Y a== 1 O\n"
-    // "    a=*c r=a 2  (save code in R2)\n"
-    "    a=*c r=a 2\n"
-    // "    a> 63 O a>>= 6 a++ a++  (match)\n"
-    "    a> 63 O a>>= 6 a++ a++\n"
-    // "    Y a++ a++ endif  (literal)\n"
-    "    Y a++ a++ endif\n"
-    // "  Y (read rest of code)\n"
-    "  Y\n"
-    "    a--\n"
-    "  endif endif\n"
-    // "  r=a 1  (R1 = 1+expected bytes to next code)\n";
-    "  r=a 1\n";
-  }
+  string comp;
+  string hcomp="hcomp\nc-- *c=a a+= 255 d=a *d=c\na=r 1 a== 0 O\na= 111\nY a== 1 O\na=*c r=a 2\na> 63 O a>>= 6 a++ a++\nY a++ a++ endif\nY\na--\nendif endif\nr=a 1\n";
 
   // Generate the context model
   while (*ME && ncomp<254) {
     // parse command C[N1[,N2]...] Io v = {C, N1, N2...}
-    std::vector<I> v;
+    vector<I> v;
     v.push_back(*ME++);
     O (isdigit(*ME)) {
       v.push_back(*ME++-'0');
@@ -5448,72 +3489,16 @@ std::string makeConfig(const char* ME, I args[]) {
       // Masked context
       Q (unsigned i=3; i<v.size(); ++i) {
         O (i==3) hcomp+="b=c ";
-        O (v[i]==255)
-          hcomp+="a=*b hashd\n";  // ordinary byte
-        Y O (v[i]>0 && v[i]<255)
-          hcomp+="a=*b a&= "+itos(v[i])+" hashd\n";  // masked byte
-        Y O (v[i]>=256 && v[i]<512) { // lz77 state or masked literal byte
-          hcomp+=
-          "a=r 1 a> 1 O\n"  // expect literal or offset
-          "  a=r 2 a< 64 O\n"  // expect literal
-          "    a=*b ";
+        O (v[i]>=256 && v[i]<512) { // lz77 state or masked literal byte
+          hcomp+="a=r 1 a> 1 O\na=r 2 a< 64 O\na=*b ";
           O (v[i]<511) hcomp+="a&= "+itos(v[i]-256);
-          hcomp+=" hashd\n"
-          "  Y\n"  // expect match offset byte
-          "    a>>= 6 hashd a=r 1 hashd\n"
-          "  endif\n"
-          "Y\n"  // expect new code
-          "  a= 255 hashd a=r 2 hashd\n"
-          "endif\n";
+          hcomp+=" hashd\nY\na>>= 6 hashd a=r 1 hashd\nendif\nY\na= 255 hashd a=r 2 hashd\nendif\n";
         }
-        Y O (v[i]>=1256)  // skip v[i]-1000 bytes
-          hcomp+="a= "+itos(((v[i]-1000)>>8)&255)+" a<<= 8 a+= "
-               +itos((v[i]-1000)&255)+
-          " a+=b b=a\n";
-        Y O (v[i]>1000)
-          hcomp+="a= "+itos(v[i]-1000)+" a+=b b=a\n";
-        O (v[i]<512 && i<v.size()-1)
-          hcomp+="b++ ";
       }
       ++ncomp;
     }
 
-    // m,8,24: MIX, size, rate
-    // t,8,24: MIX2, size, rate
-    // s,8,32,255: SSE, size, start, limit
-    O (strchr("mts", v[0]) && ncomp>I(v[0]=='t')) {
-        E("");
-
-    //   O (v.size()<=1) v.push_back(8);
-    //   O (v.size()<=2) v.push_back(24+8*(v[0]=='s'));
-    //   O (v[0]=='s' && v.size()<=3) v.push_back(255);
-    //   comp+=itos(ncomp);
-    //   sb=5+v[1]*3/4;
-    //   O (v[0]=='m')
-    //     comp+=" mix "+itos(v[1])+" 0 "+itos(ncomp)+" "+itos(v[2])+" 255\n";
-    //   Y O (v[0]=='t')
-    //     comp+=" mix2 "+itos(v[1])+" "+itos(ncomp-1)+" "+itos(ncomp-2)
-    //         +" "+itos(v[2])+" 255\n";
-    //   Y // s
-    //     comp+=" sse "+itos(v[1])+" "+itos(ncomp-1)+" "+itos(v[2])+" "
-    //         +itos(v[3])+"\n";
-    //   O (v[1]>8) {
-    //     hcomp+="d= "+itos(ncomp)+" *d=0 b=c a=0\n";
-    //     Q (; v[1]>=16; v[1]-=8) {
-    //       hcomp+="a<<= 8 a+=*b";
-    //       O (v[1]>16) hcomp+=" b++";
-    //       hcomp+="\n";
-    //     }
-    //     O (v[1]>8)
-    //       hcomp+="a<<= 8 a+=*b a>>= "+itos(16-v[1])+"\n";
-    //     hcomp+="a<<= 8 *d=a\n";
-    //   }
-    //   ++ncomp;
-    }
-
-    // i: ISSE chain with order increasing by N1,N2...
     O (v[0]=='i' && ncomp>0) {
-    //   assert(sb>=5);
       hcomp+="d= "+itos(ncomp-1)+" b=c a=*d d++\n";
       Q (unsigned i=1; i<v.size() && ncomp<254; ++i) {
         Q (I j=0; j<v[i]%10; ++j) {
@@ -5529,239 +3514,52 @@ std::string makeConfig(const char* ME, I args[]) {
         ++ncomp;
       }
     }
-
-    // a24,0,0: MATCH. N1=hash multiplier. N2,N3=halve buf, table.
-    O (v[0]=='a') {
-        E("");
-    //   O (v.size()<=1) v.push_back(24);
-    //   while (v.size()<4) v.push_back(0);
-    //   comp+=itos(ncomp)+" match "+itos(membits-v[3]-2)+" "
-    //       +itos(membits-v[2])+"\n";
-    //   hcomp+="d= "+itos(ncomp)+" a=*d a*= "+itos(v[1])
-    //        +" a+=*c a++ *d=a\n";
-    //   sb=5+(membits-v[2])*3/4;
-    //   ++ncomp;
-    }
-
-    // w1,65,26,223,20,0: ICM-ISSE chain of length N1 with word contexts,
-    // where a word is a sequence of c such that c&N4 is in N2..N2+N3-1.
-    // Word is hashed by: hash := hash*N5+c+1
-    // Decrease memory by 2^-N6.
-    O (v[0]=='w') {
-        E("");
-
-
-    //   O (v.size()<=1) v.push_back(1);
-    //   O (v.size()<=2) v.push_back(65);
-    //   O (v.size()<=3) v.push_back(26);
-    //   O (v.size()<=4) v.push_back(223);
-    //   O (v.size()<=5) v.push_back(20);
-    //   O (v.size()<=6) v.push_back(0);
-    //   comp+=itos(ncomp)+" icm "+itos(membits-6-v[6])+"\n";
-    //   Q (I i=1; i<v[1]; ++i)
-    //     comp+=itos(ncomp+i)+" isse "+itos(membits-6-v[6])+" "
-    //         +itos(ncomp+i-1)+"\n";
-    //   hcomp+="a=*c a&= "+itos(v[4])+" a-= "+itos(v[2])+" a&= 255 a< "
-    //        +itos(v[3])+" O\n";
-    //   Q (I i=0; i<v[1]; ++i) {
-    //     O (i==0) hcomp+="  d= "+itos(ncomp);
-    //     Y hcomp+="  d++";
-    //     hcomp+=" a=*d a*= "+itos(v[5])+" a+=*c a++ *d=a\n";
-    //   }
-    //   hcomp+="Y\n";
-    //   Q (I i=v[1]-1; i>0; --i)
-    //     hcomp+="  d= "+itos(ncomp+i-1)+" a=*d d++ *d=a\n";
-    //   hcomp+="  d= "+itos(ncomp)+" *d=0\n"
-    //        "endif\n";
-    //   ncomp+=v[1]-1;
-    //   sb=membits-v[6];
-    //   ++ncomp;
-    }
   }
   return hdr+itos(ncomp)+"\n"+comp+hcomp+"halt\n"+pcomp;
 }
 
-// Compress from in to out in 1 segment in 1 block using the algorithm
-// descried in ME. O ME begins with a digit then choose
-// a ME depending on type. Save filename and comment
-// in the segment D. O comment is 0 then the default is the input size
-// as a decimal string, plus " jDC\x01" Q a journaling ME (ME[0]
-// is not 's'). Write the generated ME to methodOut O not 0.
-void compressBlock(SB* in, Writer* out, const char* method_,
-                   const char* filename, const char* comment, bool dosha1) {
-  std::string ME=method_;
+void compressBlock(SB* in, Writer* out) {
+  string ME="3";
   const unsigned n=in->size();  // input size
   const I arg0=MAX(lg(n+4095)-20, 0);  // block size
-//   assert((1u<<(arg0+20))>=n+4096);
 
-  // Get type from ME "LB,R,t" where L is level 0..5, B is block
-  // size 0..11, R is redundancy 0..255, t = 0..3 = binary, text, exe, both.
   unsigned type=0;
-  O (isdigit(ME[0])) {
-    I commas=0, arg[4]={0};
-    Q (I i=1; i<I(ME.size()) && commas<4; ++i) {
-      O (ME[i]==',' || ME[i]=='.') ++commas;
-      Y O (isdigit(ME[i])) arg[commas]=arg[commas]*10+ME[i]-'0';
-    }
-    O (commas==0) type=512;
-    Y type=arg[1]*4+arg[2];
+  I commas=0, arg[4]={0};
+  Q (I i=1; i<I(ME.size()) && commas<4; ++i) {
+    O (ME[i]==',' || ME[i]=='.') ++commas;
+    Y O (isdigit(ME[i])) arg[commas]=arg[commas]*10+ME[i]-'0';
   }
-
-  // Get hash of input
-//   LQ::SHA1 sha1;
-//   const char* sha1ptr=0;
-// #ifdef DEBUG
-//   O (true) {
-// #Y
-//   O (dosha1) {
-// #endif
-//     sha1.write(in->c_str(), n);
-//     sha1ptr=sha1.result();
-//   }
+  O (commas==0) type=512;
+  Y type=arg[1]*4+arg[2];
 
   // Expand default methods
-  O (isdigit(ME[0])) {
-    const I level=ME[0]-'0';
-    // assert(level>=0 && level<=9);
+  const I level=3;
+  // assert(level>=0 && level<=9);
 
-    // build models
-    const I doe8=(type&2)*2;
-    ME="x"+itos(arg0);
-    std::string htsz=","+itos(19+arg0+(arg0<=6));  // lz77 hash table size
-    std::string sasz=","+itos(21+arg0);            // lz77 suffix array size
+  // build models
+  const I doe8=(type&2)*2;
+  ME="x"+itos(arg0);
+  string htsz=","+itos(19+arg0+(arg0<=6));  // lz77 hash table size
+  string sasz=","+itos(21+arg0);            // lz77 suffix array size
 
-    // store uncompressed
-    O (level==0)
-      ME="0"+itos(arg0)+",0";
-
-    // LZ77, no model. Store O hard to compress
-    Y O (level==1) {
-        E("");
-    //   O (type<40) ME+=",0";
-    //   Y {
-    //     ME+=","+itos(1+doe8)+",";
-    //     O      (type<80)  ME+="4,0,1,15";
-    //     Y O (type<128) ME+="4,0,2,16";
-    //     Y O (type<256) ME+="4,0,2"+htsz;
-    //     Y O (type<960) ME+="5,0,3"+htsz;
-    //     Y               ME+="6,0,3"+htsz;
-    //   }
-    }
-
-    // LZ77 with longer search
-    Y O (level==2) {
-        E("");
-    //   O (type<32) ME+=",0";
-    //   Y {
-    //     ME+=","+itos(1+doe8)+",";
-    //     O (type<64) ME+="4,0,3"+htsz;
-    //     Y ME+="4,0,7"+sasz+",1";
-    //   }
-    }
-
-    // LZ77 with CM depending on redundancy
-    Y O (level==3) {
-      O (type<20)  // store O not compressible
-        ME+=",0";
-      Y O (type<48)  // fast LZ77 O barely compressible
-        ME+=","+itos(1+doe8)+",4,0,3"+htsz;
-      Y O (type>=640 || (type&1))  // BWT O text or highly compressible
-        ME+=","+itos(3+doe8)+"ci1";
-      Y  // LZ77 with O0-1 compression of up to 12 literals
-        ME+=","+itos(2+doe8)+",12,0,7"+sasz+",1c0,0,511i2";
-    }
-
-    // LZ77+CM, fast CM, or BWT depending on type
-    Y O (level==4) {
-        E("");
-    //   O (type<12)
-    //     ME+=",0";
-    //   Y O (type<24)
-    //     ME+=","+itos(1+doe8)+",4,0,3"+htsz;
-    //   Y O (type<48)
-    //     ME+=","+itos(2+doe8)+",5,0,7"+sasz+"1c0,0,511";
-    //   Y O (type<900) {
-    //     ME+=","+itos(doe8)+"ci1,1,1,1,2a";
-    //     O (type&1) ME+="w";
-    //     ME+="m";
-    //   }
-    //   Y
-    //     ME+=","+itos(3+doe8)+"ci1";
-    }
-
-    // Slow CM with lots of models
-    Y {  // 5..9
-        E("");
-    //   // Model text files
-    //   ME+=","+itos(doe8);
-    //   O (type&1) ME+="w2c0,1010,255i1";
-    //   Y ME+="w1i1";
-    //   ME+="c256ci1,1,1,1,1,1,2a";
-
-    //   // Analyze the data
-    //   const I NR=1<<12;
-    //   I pt[256]={0};  // position of L occurrence
-    //   I r[NR]={0};    // count repetition gaps of length r
-    //   const unsigned char* p=in->data();
-    //   O (level>0) {
-    //     Q (unsigned i=0; i<n; ++i) {
-    //       const I k=i-pt[p[i]];
-    //       O (k>0 && k<NR) ++r[k];
-    //       pt[p[i]]=i;
-    //     }
-    //   }
-
-    //   // Add periodic models
-    //   I n1=n-r[1]-r[2]-r[3];
-    //   Q (I i=0; i<2; ++i) {
-    //     I period=0;
-    //     double score=0;
-    //     I t=0;
-    //     Q (I j=5; j<NR && t<n1; ++j) {
-    //       const double s=r[j]/(256.0+n1-t);
-    //       O (s>score) score=s, period=j;
-    //       t+=r[j];
-    //     }
-    //     O (period>4 && score>0.1) {
-    //       ME+="c0,0,"+itos(999+period)+",255i1";
-    //       O (period<=255)
-    //         ME+="c0,"+itos(period)+"i1";
-    //       n1-=r[period];
-    //       r[period]=0;
-    //     }
-    //     Y
-    //       break;
-    //   }
-    //   ME+="c0,2,0,255i1c0,3,0,0,255i1c0,4,0,0,0,255i1mm16ts19t0";
-    }
-  }
+  ME+=","+itos(2+doe8)+",12,0,7"+sasz+",1c0,0,511i2";
 
   // Compress
-  std::string config;
+  string config;
   I args[9]={0};
   config=makeConfig(ME.c_str(), args);
 
-  LQ::C co;
-  co.setOutput(out);
+  LZBuffer lz(*in, args);
+  LQ::C co{&lz,out};
 
-  SB pcomp_cmd;
-  co.startBlock(config.c_str(), args, &pcomp_cmd);
-  std::string cs=itos(n);
-  co.startSegment(filename, cs.c_str());
-  O (args[1]>=1 && args[1]<=7 && args[1]!=4) {  // LZ77 or BWT
-    LZBuffer lz(*in, args);
-    co.setInput(&lz);
-    co.compress();
-  }
-  Y { 
-    E("unsupported");
-  }
-
-  co.endSegment(0);
+  co.startBlock(config.c_str(), args);
+  string cs=itos(n);
+  co.startSegment();
+  co.compress();
+  co.endSegment();
 }
 
 }  // end namespace LQ
-
 
 namespace zpaq {
   td::BufferSlice compress(td::Slice data) {
@@ -5770,7 +3568,7 @@ namespace zpaq {
     LQ::SB in, out;
     in.write(data.data(), size);
 
-    LQ::compressBlock(&in, &out, "3", 0, 0, false);
+    LQ::compressBlock(&in, &out);
 
     return td::BufferSlice(out.c_str(), out.size());
   }
@@ -5786,3 +3584,4 @@ namespace zpaq {
 #undef Y
 #undef O
 #undef Q
+#undef F

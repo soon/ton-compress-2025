@@ -74,6 +74,11 @@ requires_define = {
     "as_cellslice",
     "ShardFeeCreated",
     "fetch_ulong",
+    "ref_idx",
+    "push_back",
+    "store_ptr",
+    "McBlockExtra",
+    "HashmapAugNode",
 }
 
 cannot_be_replaced = {
@@ -181,7 +186,7 @@ def minify_cpp(source_code):
     # Remove single-line comments (//)
     source_code = re.sub(r'//.*', '', source_code)
 
-    return source_code
+    source_code = re.sub(r'\bstatic_cast<(.+)>', r'(\g<1>)', source_code)
 
     # Remove leading and trailing whitespaces from each line
     lines = [line.strip() for line in source_code.splitlines()]
@@ -248,6 +253,17 @@ def minify_cpp(source_code):
     replace_exhaust(" += ", "+=")
     replace_exhaust(" -= ", "-=")
     replace_exhaust("] > ", "]>")
+    replace_exhaust(":\n", ":")
+    replace_exhaust(")| (", ")|(")
+    replace_exhaust(")> (", ")>(")
+    replace_exhaust(")< (", ")<(")
+    replace_exhaust(" - ", "-")
+    replace_exhaust(" + ", "+")
+    replace_exhaust(", *", ",*")
+    replace_exhaust("I *\n", "I*")
+    replace_exhaust("I *", "I*")
+    replace_exhaust("char *", "char*")
+
 
     replace_exhaust("{}\n", "{}")
     replace_exhaust(";(\n", ";(")
