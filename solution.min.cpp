@@ -16,313 +16,780 @@
 #include"td/utils/lz4.h"
 #include"td/utils/misc.h"
 #include"td/utils/buffer.h"
+#include<errno.h>
+#include<stddef.h>
+#include<string.h>
+#include<stdint.h>
 #define private public
 #define final
 #include"block/block-auto.h"
 #include"block/block-parse.h"
 #include"vm/boc.h"
 #include"crypto/vm/boc-writers.h"
-#define dC HashmapAugNode
-#define dz skip
-#define du in_msg_descr
-#define ds as_cellslice
-#define dr McBlockExtra
-#define dq store_ptr
-#define dp push_back
-#define dm continue
-#define di ShardFeeCreated
-#define de true
-#define dd ref_idx
-#define db blen
-#define cX out_msg_descr
-#define cU class
-#define cP else
-#define cO template
-#define cN bool
-#define cG CurrencyCollection
-#define cB fetch_ulong
-#define cn state_update
-#define cl special_type
-#define bV HashmapAugE
-#define bQ store_long
-#define bO virtual
-#define bN extra
-#define bL append_cellslice
-#define bK BufferSlice
-#define bD string
-#define bx write
-#define bq size_t
-#define bl fetch_ref
-#define bj data
-#define bi auto
-#define bf char
-#define be size
-#define bb store_ref
-#define ba while
-#define V struct
-#define U CellSlice
-#define S CellBuilder
-#define N void
-#define J const
-#define G unsigned
-#define B return
-#define u case
-#define g break
-using namespace vm;using namespace std;set<bD> enabled_optimizations{"Block","BlockExtra","bV","HashmapAug","dC","InMsgDescr","OutMsgDescr","dr","ShardFees","ShardAccountBlocks","MERKLE_UPDATE","Maybe",};U to_cs(Ref<Cell> cell){cN can_be_special=false;B load_cell_slice_special(std::move(cell),can_be_special);}V A{ostream&out;};cO<cU T_TLB>V K{U incoming_cs;U bJ;U ccs;bD name;T_TLB bo;int cl=0;K(bD name):K(name,T_TLB()){}K(bD name,T_TLB bo):name(name),bo(bo){}bO ~K(){}bO N bg(A&ctx,U&cs,int o=0){}bO N bt(A&ctx,S&cb,int o=0){bu(ctx,cb,o);}bO N bh(A&ctx,U&cs,int o=0){bg(ctx,cs,o);}bO N bu(A&ctx,S&cb,int o=0){}cN is_enabled(){B enabled_optimizations.count(name)> 0;}cN cV(){B cl==1;}N bw(A&ctx,U&cs,int o=0,cN cW=false){bi e=is_enabled();cl=(int)cs.cl();incoming_cs=cs;if(cV()){cs.advance(288);B;}if(e){bg(ctx,cs,o);}cP{bJ=bo.fetch(cs).bx();}}N bZ(A&ctx,S&cb,int o=0){bi e=is_enabled();if(cV()){cb.bL(incoming_cs);}cP if(e){bt(ctx,cb,o);}cP{cb.bL(bJ);}}N bC(A&ctx,U&cs,int o=0,cN cW=false){bi e=is_enabled();incoming_cs=cs;if(e){bh(ctx,cs,o);}cP{bJ=bo.fetch(cs).bx();}}N bM(A&ctx,S&cb,int o=0){bi e=is_enabled();if(cV()){cb.bL(incoming_cs);}cP if(e){bu(ctx,cb,o);}cP{if(!bJ.is_valid()){throw runtime_error(name+":optimization is disabled,but bJ is empty,meaning it was never set");}cb.bL(bJ);}}Ref<Cell> bc(A&ctx,int o=0){S cb;bM(ctx,cb,o);B cb.finalize(cl!=0);}Ref<Cell> by(A&ctx,int o=0){S cb;bZ(ctx,cb,o);B cb.finalize(cl!=0);}N bd(A&ctx,Ref<Cell> cell_ref,int o=0,cN cW=false){bi cs=to_cs(std::move(cell_ref));bw(ctx,cs,o,cW);}N bk(A&ctx,Ref<Cell> cell_ref,int o=0,cN cW=false){bi cs=to_cs(std::move(cell_ref));bC(ctx,cs,o,cW);}N fetch_remaining(U&cs){ccs=cs;cs.advance(cs.be());cs.advance_refs(cs.size_refs());}N append_remaining(S&cb){cb.bL(ccs);}};V ca{bO ~ca(){}bO U cw(){throw runtime_error("aug bj requested but not implemented");}};cO<cU T_TLB>V cx{T_TLB add_type;cx(T_TLB add_type):add_type(add_type){}cx():cx(T_TLB{}){}bO ~cx(){}bO U add_values(U&cs1,U&cs2){S cb;(add_type.add_values(cb,cs1,cs2));B cb.ds();}};using namespace block::tlb;J cG tCC;J OutMsg tOM;J AccountBlock tAB;J ImportFees tIF;J InMsg tIM;J EnqueuedMsg tEM;J UInt tU64{64};J di tSFC;cO<cU cJ,cU cA>V bA;cO<cU cJ,cU cA>V FullHashmapAugNode:K<block::gen::dC>{int tag=-1;int n=-1;Ref<bA<cJ,cA>> left;Ref<bA<cJ,cA>> right;cJ cc;cA bN;FullHashmapAugNode(int m,J TLB&X,J TLB&Y):K("dC",block::gen::dC(m,X,Y)){}N bg(A&ctx,U&cs,int o=0){tag=bo.check_tag(cs);if(tag==0){bN.bw(ctx,cs,o+1);cc.bw(ctx,cs,o+1);}cP{int n;add_r1(n,1,bo.m_);left=Ref<bA<cJ,cA>>(de,n,bo.X_,bo.Y_);left.bx().bd(ctx,cs.bl(),o+1);right=Ref<bA<cJ,cA>>(de,n,bo.X_,bo.Y_);right.bx().bd(ctx,cs.bl(),o+1);bN.bw(ctx,cs,o+1);}}N bt(A&ctx,S&cb,int o=0){if(tag==0){cc.bZ(ctx,cb,o+1);}cP{int n;(add_r1(n,1,bo.m_));cb.bb(left.bx().by(ctx,o+1));cb.bb(right.bx().by(ctx,o+1));}}N bh(A&ctx,U&cs,int o=0){tag=bo.check_tag(cs);if(tag==0){cc.bC(ctx,cs,o+1);bi extra_cs=cc.cw();bN.bC(ctx,extra_cs,o+1,de);}cP{int n;add_r1(n,1,bo.m_);left=Ref<bA<cJ,cA>>(de,n,bo.X_,bo.Y_);left.bx().bk(ctx,cs.bl(),o+1);right=Ref<bA<cJ,cA>>(de,n,bo.X_,bo.Y_);right.bx().bk(ctx,cs.bl(),o+1);bi left_extra_cs=to_cs(left.bx().node.bN.bc(ctx));bi right_extra_cs=to_cs(right.bx().node.bN.bc(ctx));bi extra_cs=bN.add_values(left_extra_cs,right_extra_cs);bN.bC(ctx,extra_cs,o+1,de);}}N bu(A&ctx,S&cb,int o=0){if(tag==0){bN.bM(ctx,cb,o+1);cc.bM(ctx,cb,o+1);}cP{int n;(add_r1(n,1,bo.m_));cb.bb(left.bx().bc(ctx,o+1));cb.bb(right.bx().bc(ctx,o+1));bN.bM(ctx,cb,o+1);}}};cO<cU cJ,cU cA>V bA:K<block::gen::HashmapAug>,td::CntObject{Ref<U> label;int n,m,l;FullHashmapAugNode<cJ,cA> node;bA(int n,J TLB&X,J TLB&Y):K("HashmapAug",block::gen::HashmapAug(n,X,Y)),node(n,X,Y){}N bg(A&ctx,U&cs,int o=0){n=bo.m_;(block::gen::HmLabel{n}.fetch_to(cs,label,l));m=n-l;node.bo.m_=m;node.bw(ctx,cs,o+1);}N bt(A&ctx,S&cb,int o=0){int l,m;(tlb::store_from(cb,HmLabel{bo.m_},label,l));(add_r1(m,l,bo.m_));node.bZ(ctx,cb,o+1);}N bh(A&ctx,U&cs,int o=0){(
-(n=bo.m_)>= 0
-&&block::gen::HmLabel{bo.m_}.fetch_to(cs,label,l)&&add_r1(m,l,bo.m_));node.bo.m_=m;node.bC(ctx,cs,o+1);}N bu(A&ctx,S&cb,int o=0){int l,m;(tlb::store_from(cb,block::gen::HmLabel{bo.m_},label,l)&&add_r1(m,l,bo.m_));node.bM(ctx,cb,o+1);}};cO<cU cJ,cU cA>V ce:K<block::gen::bV>{block::gen::bV::Record_ahme_root r;int tag=-1;bA<cJ,cA> root;cA bN;ce(int n,J TLB&X,J TLB&Y):K("bV",block::gen::bV(n,X,Y)),root(n,X,Y){}N bg(A&ctx,U&cs,int o=0){tag=bo.check_tag(cs);if(tag==block::gen::bV::ahme_empty){(cs.cB(1)== 0);bN.bw(ctx,cs,o+1);}cP{(bo.unpack(cs,r));root.bd(ctx,r.root,o+1);bN.bw(ctx,r.bN.bx(),o+1);}}N bt(A&ctx,S&cb,int o=0){if(tag==bV::ahme_empty){cb.bQ(0,1);bN.bZ(ctx,cb,o+1);}cP{cb.bQ(1,1).bb(root.by(ctx,o+1));}}N bh(A&ctx,U&cs,int o=0){tag=bo.check_tag(cs);if(tag==bV::ahme_empty){(cs.cB(1)== 0);bN.bC(ctx,cs,o+1);}cP{(cs.cB(1)== 1&&(r.n=bo.m_)>= 0);bi root_ref=cs.bl();root.bk(ctx,root_ref,o+1);bN=root.node.bN;}}N bu(A&ctx,S&cb,int o=0){if(tag==bV::ahme_empty){cb.bQ(0,1);bN.bM(ctx,cb,o+1);}cP{cb.bQ(1,1).bb(root.bc(ctx,o+1));bN.bM(ctx,cb,o+1);}}};cO<cU T>V FullMaybe:K<TLB>{T cc;int tag=-1;cN is_ref;FullMaybe(cN is_ref=false):K("Maybe"),is_ref(is_ref){}N bg(A&ctx,U&cs,int o=0){tag=cs.cB(1);if(tag){if(is_ref){cc.bd(ctx,cs.bl(),o+1);}cP{cc.bw(ctx,cs,o+1);}}}bO N bt(A&ctx,S&cb,int o=0){(cb.store_long_bool(tag,1));if(tag){if(is_ref){cb.bb(cc.by(ctx,o+1));}cP{cc.bZ(ctx,cb,o+1);}}}bO N bh(A&ctx,U&cs,int o=0){tag=cs.cB(1);if(tag){if(is_ref){cc.bk(ctx,cs.bl(),o+1);}cP{cc.bC(ctx,cs,o+1);}}}N bu(A&ctx,S&cb,int o=0){(cb.store_long_bool(tag,1));if(tag){if(is_ref){cb.bb(cc.bc(ctx,o+1));}cP{cc.bM(ctx,cb,o+1);}}}};V cK;V FullInMsg:K<InMsg>,ca{FullInMsg():K("InMsg",InMsg()){}U cw(){S cb;bi cs_copy=bJ;(bo.get_import_fees(cb,cs_copy));B cb.ds();}};V cf:K<cG>,cx<cG>{cf():K("cG"){}};V FullOutMsg:K<OutMsg>,ca{FullOutMsg():K("OutMsg",OutMsg()){}U cw(){S cb;bi cs_copy=bJ;(bo.get_export_value(cb,cs_copy));B cb.ds();}};cO<cU T>V FullMERKLE_UPDATE:K<TLB>{Ref<T> cQ,to_proof;FullMERKLE_UPDATE(J T&bo):K("MERKLE_UPDATE"){}N bg(A&ctx,U&cs,int o=0){(cs.advance(520));cQ=Ref<T>(de);cQ.bx().bd(ctx,cs.bl(),o+1);to_proof=Ref<T>(de);to_proof.bx().bd(ctx,cs.bl(),o+1);}N bt(A&ctx,S&cb,int o=0){cb.bb(cQ.bx().bc(ctx,o+1));cb.bb(to_proof.bx().bc(ctx,o+1));cl=0;}N bh(A&ctx,U&cs,int o=0){cQ=Ref<T>(de);cQ.bx().bd(ctx,cs.bl(),o+1);to_proof=Ref<T>(de);to_proof.bx().bd(ctx,cs.bl(),o+1);}Ref<Cell> bc(A&ctx,int o=0){B S::create_merkle_update(
-cQ.bx().bc(ctx,o+1),to_proof.bx().bc(ctx,o+1));}};V FullAccountBlock:K<AccountBlock>,ca{FullAccountBlock():K("AccountBlock"){}U cw(){S cb;bi cs_copy=bJ;(Aug_ShardAccountBlocks().eval_leaf(cb,cs_copy));B cb.ds();}};V cR:K<block::gen::ShardAccountBlocks>{ce<FullAccountBlock,cf> x{256,tAB,tCC};cR():K("ShardAccountBlocks"){}N bg(A&ctx,U&cs,int o=0){x.bw(ctx,cs,o+1);}N bt(A&ctx,S&cb,int o=0){x.bZ(ctx,cb,o+1);}N bh(A&ctx,U&cs,int o=0){x.bC(ctx,cs,o+1);}N bu(A&ctx,S&cb,int o=0){x.bM(ctx,cb,o+1);}};V MyMcStateExtra:block::gen::McStateExtra{cN dz(vm::U&cs)J {B cs.advance(16)&&block::gen::ShardHashes().dz(cs)&&cs.advance_ext(0x100,2)&&tCC.dz(cs);}};V FullMcStateExtra:K<MyMcStateExtra>{FullMcStateExtra():K("McStateExtra",MyMcStateExtra()){}};J block::gen::ShardStateUnsplit_aux tSSUa;J block::gen::RefT tRMSE{MyMcStateExtra()};J block::gen::Maybe tMRMSE{tRMSE};V MyShardStateUnsplit:block::gen::ShardStateUnsplit{cN dz(vm::U&cs)J{B cs.advance_ext(0x169,3)&&tMRMSE.dz(cs);}};V FullShardState:K<ShardState>,td::CntObject{FullShardState():K("ShardState"){}};V cy:K<di>,ca,cx<di>{cy():K("di"){}U cw(){S cb;bi cs_copy=bJ;(Aug_ShardFees().eval_leaf(cb,cs_copy));B cb.ds();}};V FullShardFees:K<block::gen::ShardFees>{ce<cy,cy> x{96,tSFC,tSFC};FullShardFees():K("ShardFees"){}N bg(A&ctx,U&cs,int o=0){x.bw(ctx,cs,o+1);}N bt(A&ctx,S&cb,int o=0){x.bZ(ctx,cb,o+1);}N bh(A&ctx,U&cs,int o=0){x.bC(ctx,cs,o+1);}N bu(A&ctx,S&cb,int o=0){x.bM(ctx,cb,o+1);}};J block::gen::ShardHashes tSH;V FullMcBlockExtra:K<block::gen::dr>{block::gen::dr::Record bF;FullShardFees shard_fees;FullMcBlockExtra():K("dr"){}N bg(A&ctx,U&cs,int o=0){(cs.cB(16)== 0xcca5);(cs.fetch_bool_to(bF.key_block));(tSH.fetch_to(cs,bF.shard_hashes));shard_fees.bw(ctx,cs,o+1);fetch_remaining(cs);}N bt(A&ctx,S&cb,int o=0){cb.bQ(bF.key_block,1);tSH.store_from(cb,bF.shard_hashes);shard_fees.bZ(ctx,cb,o+1);append_remaining(cb);}N bh(A&ctx,U&cs,int o=0){(cs.fetch_bool_to(bF.key_block));(tSH.fetch_to(cs,bF.shard_hashes));shard_fees.bC(ctx,cs,o+1);fetch_remaining(cs);}N bu(A&ctx,S&cb,int o=0){cb.bQ(0xcca5,16).bQ(bF.key_block,1);tSH.store_from(cb,bF.shard_hashes);shard_fees.bM(ctx,cb,o+1);append_remaining(cb);}};V cK;V FullOutMsgDescr:K<OutMsgDescr>{ce<FullOutMsg,cf> x{256,tOM,tCC};FullOutMsgDescr():K("OutMsgDescr"){}N bg(A&ctx,U&cs,int o=0){x.bw(ctx,cs,o+1);}N bt(A&ctx,S&cb,int o=0){x.bZ(ctx,cb,o+1);}N bh(A&ctx,U&cs,int o=0){x.bC(ctx,cs,o+1);}N bu(A&ctx,S&cb,int o=0){x.bM(ctx,cb,o+1);}};V cK:K<ImportFees>,cx<ImportFees>{cK():K("ImportFees",tIF),cx(tIF){}};V FullInMsgDescr:K<InMsgDescr>{ce<FullInMsg,cK> x{256,tIM,tIF};FullInMsgDescr():K("InMsgDescr",InMsgDescr()){}N bg(A&ctx,U&cs,int o=0){x.bw(ctx,cs,o+1);}N bt(A&ctx,S&cb,int o=0){x.bZ(ctx,cb,o+1);}N bh(A&ctx,U&cs,int o=0){x.bC(ctx,cs,o+1);}N bu(A&ctx,S&cb,int o=0){x.bM(ctx,cb,o+1);}};J block::gen::dr tMBE{};J block::gen::RefT tRMBE{tMBE};J block::gen::Maybe tMRMBE(tRMBE);V FullBlockExtra:K<block::gen::BlockExtra>{block::gen::BlockExtra::Record bF;FullInMsgDescr du;FullOutMsgDescr cX;cR cL;FullMaybe<FullMcBlockExtra> custom;FullBlockExtra():K("BlockExtra"),custom(de){}N bg(A&ctx,U&cs,int o=0){((cs.cB(32)== 0x4a33f6fd));du.bd(ctx,cs.bl(),o+1);cX.bd(ctx,cs.bl(),o+1);cL.bd(ctx,cs.bl(),o+1);ccs=cs.fetch_subslice(512).bx();custom.bw(ctx,cs,o+1);}N bt(A&ctx,S&cb,int o=0){cb.bb(du.by(ctx,o+1)).bb(cX.by(ctx,o+1)).bb(cL.by(ctx,o+1)).bL(ccs);custom.bZ(ctx,cb,o+1);}N bh(A&ctx,U&cs,int o=0){du.bk(ctx,cs.bl(),o+1);cX.bk(ctx,cs.bl(),o+1);cL.bk(ctx,cs.bl(),o+1);ccs=cs.fetch_subslice(512).bx();custom.bC(ctx,cs,o+1);}N bu(A&ctx,S&cb,int o=0){cb.bQ(0x4a33f6fd,32).bb(du.bc(ctx,o+1)).bb(cX.bc(ctx,o+1)).bb(cL.bc(ctx,o+1)).bL(ccs);custom.bM(ctx,cb,o+1);}};V FullBlock:K<block::gen::Block>{block::gen::Block::Record bF;FullMERKLE_UPDATE<FullShardState> cn;FullBlockExtra bN;FullBlock():K("Block"),cn(FullShardState()){}N bg(A&ctx,U&cs,int o=0){(bo.unpack(cs,bF));cn.bd(ctx,bF.cn,o+1);bN.bd(ctx,bF.bN,o+1,de);}N bt(A&ctx,S&cb,int o=0){cb.bQ(bF.global_id,32).bb(bF.info).bb(bF.value_flow).bb(cn.by(ctx,o+1)).bb(bN.by(ctx,o+1));}N bh(A&ctx,U&cs,int o=0){(
-cs.fetch_int_to(32,bF.global_id)&&cs.fetch_ref_to(bF.info)&&cs.fetch_ref_to(bF.value_flow));cn.bk(ctx,cs.bl(),o+1);bN.bk(ctx,cs.bl(),o+1,de);}N bu(A&ctx,S&cb,int o=0){cb.bQ(0x11ef55aa,32).bQ(bF.global_id,32).bb(bF.info).bb(bF.value_flow).bb(cn.bc(ctx,o+1)).bb(bN.bc(ctx,o+1));}};cU NullStream:public ostream{cU NullBuffer:public streambuf{public:int overflow(int c){B c;}}m_nb;public:NullStream():ostream(&m_nb){}};
-#define Y cP
-#define O if
-#define Q for
-#define F(x)for(int i=0;i<(x);++i)
-using I=int;namespace LQ{typedef uint8_t U8;typedef uint16_t U16;typedef uint32_t U32;typedef uint64_t U64;N E(J bf* msg=0){throw runtime_error(msg);}I lg(G x){G r=0;O(x>=65536)r=16,x>>=16;O(x>=256)r+=8,x>>=8;O(x>=16)r+=4,x>>=4;B
-"\x00\x01\x02\x02\x03\x03\x03\x03\x04\x04\x04\x04\x04\x04\x04\x04"[x]+r;}I tolower(I c){B(c>='A'&&c<='Z')?c+'a'-'A':c;}
-bD cS(int64_t x,I n=1){bD r;Q(;x||n>0;x/=10,--n)r=bD(1,'0'+x%10)+r;B r;}V cY{bO I get()= 0;bO I read(bf* buf,I n){I i=0,c;ba(i<n&&(c=get())>=0)
-buf[i++]=c;B i;}bO ~cY(){}};V dv{bO N put(I c)= 0;bO N bx(J bf* buf,I n){F(n)put(U8(buf[i]));}bO ~dv(){}};I toU16(J bf* p){B(p[0]&255)+256*(p[1]&255);}J I compsize[256]={0,2,3,2,3,4,6,6,3,5};cO<cU T>V cz{T *bj;bq n;I offset;N operator=(J cz&);cz(J cz&);cz(bq sz=0,I ex=0):bj(0),n(0),offset(0){bm(sz,ex);}
-N bm(bq sz,I ex=0){ba(ex>0){O(sz>sz*2)E(0);sz*=2,--ex;}O(n>0){::free((bf*)bj-offset);}n=0;offset=0;O(sz==0)B;n=sz;J bq nb=128+n*sizeof(T);O(nb<=128||(nb-128)/sizeof(T)!=n)n=0,E(0);bj=(T*)::calloc(nb,1);O(!bj)n=0,E(0);offset=64-(((bf*)bj-(bf*)0)&63);bj=(T*)((bf*)bj+offset);}~cz(){bm(0);}
-bq be(){B n;}
-I isize(){B I(n);}
-T&operator[](bq i){B bj[i];}
-T&operator()(bq i){B bj[i&(n-1)];}};typedef enum{NONE,CONS,CM,ICM,MATCH,AVG,MIX2,MIX,ISSE,SSE}CompType;V Decoder;V ZP{ZP(){output=0;rcode=0;rcode_size=0;clear();outbuf.bm(1<<14);bufptr=0;}N clear(){ck=bU=bB=0;a=b=c=d=f=pc=0;D.bm(0);h.bm(0);m.bm(0);r.bm(0);}N inith(){df(D[2],D[3]);}
-N initp(){df(D[4],D[5]);}
-N run(U32 input);I read(cY* in2){I cv=in2->get();cv+=in2->get()*256;D.bm(cv+300);ck=bU=bB=0;D[ck++]=cv&255;D[ck++]=cv>>8;ba(ck<7)D[ck++]=in2->get();I n=D[ck-1];F(n){I bo=in2->get();D[ck++]=bo;I be=compsize[bo];Q(I j=1;j<be;++j)
-D[ck++]=in2->get();}O((D[ck++]=in2->get())!=0)E(0);bU=bB=ck+128;ba(bB<cv+129){I op=in2->get();D[bB++]=op;}O((D[bB++]=in2->get())!=0)E(0);B ck+bB-bU;}cN bx(dv* out2,cN pp){O(D.be()<=6)B false;O(!pp){F(ck)out2->put(D[i]);}Y{out2->put((bB-bU)&255);out2->put((bB-bU)>>8);}Q(I i=bU;i<bB;++i)
-out2->put(D[i]);B de;}I step(U32 input,I mode);dv* output;U32 H(I i){B h(i);}
-N flush(){O(output)output->bx(&outbuf[0],bufptr);bufptr=0;}N outc(I ch){O(ch<0||(outbuf[bufptr]=ch,++bufptr==outbuf.isize()))flush();}cz<U8> D;I ck,bU,bB;cz<U8> m;cz<U32> h,r;cz<bf> outbuf;I bufptr;U32 a,b,c,d;I f,pc,rcode_size;U8* rcode;N df(I hbits,I mbits){h.bm(1,hbits);m.bm(1,mbits);r.bm(256);a=b=c=d=pc=f=0;}I execute(){switch(D[pc++]){u 1:++a;g;u 2:--a;g;u 3:a=~a;g;u 4:a=0;g;u 7:a=r[D[pc++]];g;u 8:swap(b);g;u 9:++b;g;u 10:--b;g;u 11:b=~b;g;u 12:b=0;g;u 15:b=r[D[pc++]];g;u 16:swap(c);g;u 17:++c;g;u 18:--c;g;u 19:c=~c;g;u 20:c=0;g;u 23:c=r[D[pc++]];g;u 24:swap(d);g;u 25:++d;g;u 26:--d;g;u 27:d=~d;g;u 28:d=0;g;u 31:d=r[D[pc++]];g;u 32:swap(m(b));g;u 33:++m(b);g;u 34:--m(b);g;u 35:m(b)= ~m(b);g;u 36:m(b)= 0;g;u 39:O(f)pc+=((D[pc]+128)&255)-127;Y ++pc;g;u 40:swap(m(c));g;u 41:++m(c);g;u 42:--m(c);g;u 43:m(c)= ~m(c);g;u 44:m(c)= 0;g;u 47:O(!f)pc+=((D[pc]+128)&255)-127;Y ++pc;g;u 48:swap(h(d));g;u 49:++h(d);g;u 50:--h(d);g;u 51:h(d)= ~h(d);g;u 52:h(d)= 0;g;u 55:r[D[pc++]]=a;g;u 56:B 0 ;u 57:outc(a&255);g;u 59:a=(a+m(b)+512)*773;g;u 60:h(d)= (h(d)+a+512)*773;g;u 63:pc+=((D[pc]+128)&255)-127;g;u 64:g;u 65:a=b;g;u 66:a=c;g;u 67:a=d;g;u 68:a=m(b);g;u 69:a=m(c);g;u 70:a=h(d);g;u 71:a=D[pc++];g;u 72:b=a;g;u 73:g;u 74:b=c;g;u 75:b=d;g;u 76:b=m(b);g;u 77:b=m(c);g;u 78:b=h(d);g;u 79:b=D[pc++];g;u 80:c=a;g;u 81:c=b;g;u 82:g;u 83:c=d;g;u 84:c=m(b);g;u 85:c=m(c);g;u 86:c=h(d);g;u 87:c=D[pc++];g;u 88:d=a;g;u 89:d=b;g;u 90:d=c;g;u 91:g;u 92:d=m(b);g;u 93:d=m(c);g;u 94:d=h(d);g;u 95:d=D[pc++];g;u 96:m(b)=a;g;u 97:m(b)=b;g;u 98:m(b)=c;g;u 99:m(b)=d;g;u 100:g;u 101:m(b)=m(c);g;u 102:m(b)=h(d);g;u 103:m(b)=D[pc++];g;u 104:m(c)=a;g;u 105:m(c)=b;g;u 106:m(c)=c;g;u 107:m(c)=d;g;u 108:m(c)=m(b);g;u 109:g;u 110:m(c)=h(d);g;u 111:m(c)=D[pc++];g;u 112:h(d)=a;g;u 113:h(d)=b;g;u 114:h(d)=c;g;u 115:h(d)=d;g;u 116:h(d)=m(b);g;u 117:h(d)=m(c);g;u 118:g;u 119:h(d)=D[pc++];g;u 128:a+=a;g;u 129:a+=b;g;u 130:a+=c;g;u 131:a+=d;g;u 132:a+=m(b);g;u 133:a+=m(c);g;u 134:a+=h(d);g;u 135:a+=D[pc++];g;u 136:a-=a;g;u 137:a-=b;g;u 138:a-=c;g;u 139:a-=d;g;u 140:a-=m(b);g;u 141:a-=m(c);g;u 142:a-=h(d);g;u 143:a-=D[pc++];g;u 144:a*=a;g;u 145:a*=b;g;u 146:a*=c;g;u 147:a*=d;g;u 148:a*=m(b);g;u 149:a*=m(c);g;u 150:a*=h(d);g;u 151:a*=D[pc++];g;u 152:div(a);g;u 153:div(b);g;u 154:div(c);g;u 155:div(d);g;u 156:div(m(b));g;u 157:div(m(c));g;u 158:div(h(d));g;u 159:div(D[pc++]);g;u 160:mod(a);g;u 161:mod(b);g;u 162:mod(c);g;u 163:mod(d);g;u 164:mod(m(b));g;u 165:mod(m(c));g;u 166:mod(h(d));g;u 167:mod(D[pc++]);g;u 168:a&=a;g;u 169:a&=b;g;u 170:a&=c;g;u 171:a&=d;g;u 172:a&=m(b);g;u 173:a&=m(c);g;u 174:a&=h(d);g;u 175:a&=D[pc++];g;u 176:a&=~a;g;u 177:a&=~b;g;u 178:a&=~c;g;u 179:a&=~d;g;u 180:a&=~m(b);g;u 181:a&=~m(c);g;u 182:a&=~h(d);g;u 183:a&=~D[pc++];g;u 184:a|=a;g;u 185:a|=b;g;u 186:a|=c;g;u 187:a|=d;g;u 188:a|=m(b);g;u 189:a|=m(c);g;u 190:a|=h(d);g;u 191:a|=D[pc++];g;u 192:a^=a;g;u 193:a^=b;g;u 194:a^=c;g;u 195:a^=d;g;u 196:a^=m(b);g;u 197:a^=m(c);g;u 198:a^=h(d);g;u 199:a^=D[pc++];g;u 200:a<<=(a&31);g;u 201:a<<=(b&31);g;u 202:a<<=(c&31);g;u 203:a<<=(d&31);g;u 204:a<<=(m(b)&31);g;u 205:a<<=(m(c)&31);g;u 206:a<<=(h(d)&31);g;u 207:a<<=(D[pc++]&31);g;u 208:a>>=(a&31);g;u 209:a>>=(b&31);g;u 210:a>>=(c&31);g;u 211:a>>=(d&31);g;u 212:a>>=(m(b)&31);g;u 213:a>>=(m(c)&31);g;u 214:a>>=(h(d)&31);g;u 215:a>>=(D[pc++]&31);g;u 216:f=1;g;u 217:f=(a==b);g;u 218:f=(a==c);g;u 219:f=(a==d);g;u 220:f=(a==U32(m(b)));g;u 221:f=(a==U32(m(c)));g;u 222:f=(a==h(d));g;u 223:f=(a==U32(D[pc++]));g;u 224:f=0;g;u 225:f=(a<b);g;u 226:f=(a<c);g;u 227:f=(a<d);g;u 228:f=(a<U32(m(b)));g;u 229:f=(a<U32(m(c)));g;u 230:f=(a<h(d));g;u 231:f=(a<U32(D[pc++]));g;u 232:f=0;g;u 233:f=(a>b);g;u 234:f=(a>c);g;u 235:f=(a>d);g;u 236:f=(a>U32(m(b)));g;u 237:f=(a>U32(m(c)));g;u 238:f=(a>h(d));g;u 239:f=(a>U32(D[pc++]));g;u 255:O((pc=bU+D[pc]+256*D[pc+1])>=bB)E(0);g;default:E(0);}B 1;}N div(U32 x){O(x)a/=x;Y a=0;}
-N mod(U32 x){O(x)a%=x;Y a=0;}
-N swap(U32&x){a^=x;x^=a;a^=x;}
-N swap(U8&x){a^=x;x^=a;a^=x;}};V dj{bq z,cxt,a,b,c;cz<U32> cm;cz<U8> ht;cz<U16> a16;N df(){z=cxt=a=b=c=0;cm.bm(0);ht.bm(0);a16.bm(0);}dj(){df();}};J U8 sns[1024]={1,2,0,0,3,5,1,0,4,6,0,1,7,9,2,0,8,11,1,1,8,11,1,1,10,12,0,2,13,15,3,0,14,17,2,1,14,17,2,1,16,19,1,2,16,19,1,2,18,20,0,3,21,23,4,0,22,25,3,1,22,25,3,1,24,27,2,2,24,27,2,2,26,29,1,3,26,29,1,3,28,30,0,4,31,33,5,0,32,35,4,1,32,35,4,1,34,37,3,2,34,37,3,2,36,39,2,3,36,39,2,3,38,41,1,4,38,41,1,4,40,42,0,5,43,33,6,0,44,47,5,1,44,47,5,1,46,49,4,2,46,49,4,2,48,51,3,3,48,51,3,3,50,53,2,4,50,53,2,4,52,55,1,5,52,55,1,5,40,56,0,6,57,45,7,0,58,47,6,1,58,47,6,1,60,63,5,2,60,63,5,2,62,65,4,3,62,65,4,3,64,67,3,4,64,67,3,4,66,69,2,5,66,69,2,5,52,71,1,6,52,71,1,6,54,72,0,7,73,59,8,0,74,61,7,1,74,61,7,1,76,63,6,2,76,63,6,2,78,81,5,3,78,81,5,3,80,83,4,4,80,83,4,4,82,85,3,5,82,85,3,5,66,87,2,6,66,87,2,6,68,89,1,7,68,89,1,7,70,90,0,8,91,59,9,0,92,77,8,1,92,77,8,1,94,79,7,2,94,79,7,2,96,81,6,3,96,81,6,3,98,101,5,4,98,101,5,4,100,103,4,5,100,103,4,5,82,105,3,6,82,105,3,6,84,107,2,7,84,107,2,7,86,109,1,8,86,109,1,8,70,110,0,9,111,59,10,0,112,77,9,1,112,77,9,1,114,97,8,2,114,97,8,2,116,99,7,3,116,99,7,3,62,101,6,4,62,101,6,4,80,83,5,5,80,83,5,5,100,67,4,6,100,67,4,6,102,119,3,7,102,119,3,7,104,121,2,8,104,121,2,8,86,123,1,9,86,123,1,9,70,124,0,10,125,59,11,0,126,77,10,1,126,77,10,1,128,97,9,2,128,97,9,2,60,63,8,3,60,63,8,3,66,69,3,8,66,69,3,8,104,131,2,9,104,131,2,9,86,133,1,10,86,133,1,10,70,134,0,11,135,59,12,0,136,77,11,1,136,77,11,1,138,97,10,2,138,97,10,2,104,141,2,10,104,141,2,10,86,143,1,11,86,143,1,11,70,144,0,12,145,59,13,0,146,77,12,1,146,77,12,1,148,97,11,2,148,97,11,2,104,151,2,11,104,151,2,11,86,153,1,12,86,153,1,12,70,154,0,13,155,59,14,0,156,77,13,1,156,77,13,1,158,97,12,2,158,97,12,2,104,161,2,12,104,161,2,12,86,163,1,13,86,163,1,13,70,164,0,14,165,59,15,0,166,77,14,1,166,77,14,1,168,97,13,2,168,97,13,2,104,171,2,13,104,171,2,13,86,173,1,14,86,173,1,14,70,174,0,15,175,59,16,0,176,77,15,1,176,77,15,1,178,97,14,2,178,97,14,2,104,181,2,14,104,181,2,14,86,183,1,15,86,183,1,15,70,184,0,16,185,59,17,0,186,77,16,1,186,77,16,1,74,97,15,2,74,97,15,2,104,89,2,15,104,89,2,15,86,187,1,16,86,187,1,16,70,188,0,17,189,59,18,0,190,77,17,1,86,191,1,17,70,192,0,18,193,59,19,0,194,77,18,1,86,195,1,18,70,196,0,19,193,59,20,0,197,77,19,1,86,198,1,19,70,196,0,20,199,77,20,1,86,200,1,20,201,77,21,1,86,202,1,21,203,77,22,1,86,204,1,22,205,77,23,1,86,206,1,23,207,77,24,1,86,208,1,24,209,77,25,1,86,210,1,25,211,77,26,1,86,212,1,26,213,77,27,1,86,214,1,27,215,77,28,1,86,216,1,28,217,77,29,1,86,218,1,29,219,77,30,1,86,220,1,30,221,77,31,1,86,222,1,31,223,77,32,1,86,224,1,32,225,77,33,1,86,226,1,33,227,77,34,1,86,228,1,34,229,77,35,1,86,230,1,35,231,77,36,1,86,232,1,36,233,77,37,1,86,234,1,37,235,77,38,1,86,236,1,38,237,77,39,1,86,238,1,39,239,77,40,1,86,240,1,40,241,77,41,1,86,242,1,41,243,77,42,1,86,244,1,42,245,77,43,1,86,246,1,43,247,77,44,1,86,248,1,44,249,77,45,1,86,250,1,45,251,77,46,1,86,252,1,46,253,77,47,1,86,254,1,47,253,77,48,1,86,254,1,48,0,0,0,0
-};V StateTable{U8 ns[1024];I bE(I s,I y){B ns[s*4+y];}
-I cminit(I s){B((ns[s*4+3]*2+1)<<22)/(ns[s*4+2]+ns[s*4+3]+1);}
-StateTable(){memcpy(ns,sns,sizeof(ns));}};V P{P(ZP&zr):c8(1),dk(1),z(zr){pcode=0;pcode_size=0;initTables=false;}N df();I predict();N update(I y);I stat(I);cN isModeled(){B z.D[6]!=0;}I c8,dk,p[256];U32 h[256];ZP&z;dj comp[256];cN initTables;I dt2k[256];I dt[1024];U16 squasht[4096];short stretcht[32768];StateTable st;U8* pcode;I pcode_size;N train(dj&cr,I y){U32&pn=cr.cm(cr.cxt);U32 count=pn&0x3ff;I E=y*32767-(cr.cm(cr.cxt)>>17);pn+=(E*dt[count]&-1024)+(count<cr.z);}I squash(I x){B squasht[x+2048];}
-I stretch(I x){B stretcht[x];}
-I clamp2k(I x){O(x<-2048)B -2048;Y O(x>2047)B 2047;Y B x;}I clamp512k(I x){O(x<-(1<<19))B -(1<<19);Y O(x>=(1<<19))B(1<<19)-1;Y B x;}bq find(cz<U8>&ht,I sizebits,U32 cxt){I chk=cxt>>sizebits&255;bq h0=(cxt*16)&(ht.be()-16);O(ht[h0]==chk)B h0;bq h1=h0^16;O(ht[h1]==chk)B h1;bq h2=h0^32;O(ht[h2]==chk)B h2;O(ht[h0+1]<=ht[h1+1]&&ht[h0+1]<=ht[h2+1])
-B memset(&ht[h0],0,16),ht[h0]=chk,h0;Y O(ht[h1+1]<ht[h2+1])
-B memset(&ht[h1],0,16),ht[h1]=chk,h1;Y
-B memset(&ht[h2],0,16),ht[h2]=chk,h2;}};V Decoder:cY{cY* in;Decoder(ZP&z):in(0),low(1),dg(0xFFFFFFFF),cg(0),bR(0),bH(0),pr(z),buf(cI){}I decompress(){O(pr.isModeled()){O(cg==0){F(4)cg=cg<<8|get();}O(decode(0)){B -1;}Y{I c=1;ba(c<256){I p=pr.predict()*2+1;c+=c+decode(p);pr.update(c&1);}B c-256;}}Y{O(cg==0){F(4)cg=cg<<8|get();O(cg==0)B -1;}--cg;B get();}}I dz(){I c=-1;O(pr.isModeled()){ba(cg==0)
-cg=get();ba(cg&&(c=get())>=0)
-cg=cg<<8|c;ba((c=get())==0);B c;}Y{O(cg==0)
-Q(I i=0;i<4&&(c=get())>=0;++i)cg=cg<<8|c;ba(cg>0){ba(cg>0){--cg;O(get()<0)B E("skipped to EOF"),-1;}Q(I i=0;i<4&&(c=get())>=0;++i)cg=cg<<8|c;}O(c>=0)c=get();B c;}}N df(){pr.df();O(pr.isModeled())low=1,dg=0xFFFFFFFF,cg=0;Y low=dg=cg=0;}I stat(I x){B pr.stat(x);}
-I get(){O(bR==bH){bR=0;bH=in ? in->read(&buf[0],cI):0;}B bR<bH ? U8(buf[bR++]):-1;}I buffered(){B bH-bR;}
-U32 low,dg;U32 cg;U32 bR,bH;P pr;enum{cI=1<<16};cz<bf> buf;I decode(I p){U32 mid=low+U32(((dg-low)*U64(U32(p)))>>16);I y;O(cg<=mid)y=1,dg=mid;Y y=0,low=mid+1;ba((dg^low)<0x1000000){dg=dg<<8|255;low=low<<8;low+=(low==0);I c=get();cg=cg<<8|c;}B y;}};V PostProcessor{I bz,cv,ph,pm;ZP z;PostProcessor(dv* out):bz(0),cv(0),ph(0),pm(0){z.output=out;}
-N df(I h,I m){bz=cv=0;ph=h;pm=m;z.clear();}I bx(I c){switch (bz){u 0:bz=c+1;O(bz==1)z.clear();g;u 1:z.outc(c);g;u 2:cv=c;bz=3;g;u 3:cv+=c*256;z.D.bm(cv+300);z.ck=8;z.bU=z.bB=z.ck+128;z.D[4]=ph;z.D[5]=pm;bz=4;g;u 4:z.D[z.bB++]=c;O(z.bB-z.bU==cv){cv=z.ck-2+z.bB-z.bU;z.D[0]=cv&255;z.D[1]=cv>>8;z.initp();bz=5;}g;u 5:z.run(c);O(c<0)z.flush();g;}B bz;}I getState()J{B bz;}};V D{D(cY* in,dv* out):z(),dec(z),pp(out){dec.in=in;}N findBlock(){I c=dec.get();z.read(&dec);}N decompress(){dec.df();pp.df(z.D[4],z.D[5]);ba((pp.getState()&3)!=1)
-pp.bx(dec.decompress());ba(1){I c=dec.decompress();pp.bx(c);O(c==-1){B;}}}ZP z;Decoder dec;PostProcessor pp;};N decompress(cY* in,dv* out){D d{in,out};d.findBlock();d.decompress();}V Encoder{Encoder(ZP&z,I be=0):out(0),low(1),dg(0xFFFFFFFF),pr(z){}N df(){low=1;dg=0xFFFFFFFF;pr.df();O(!pr.isModeled())low=0,buf.bm(1<<16);}N compress(I c){O(c==-1)
-encode(1,0);Y{encode(0,0);Q(I i=7;i>=0;--i){I p=pr.predict()*2+1;I y=c>>i&1;encode(y,p);pr.update(y);}}}I stat(I x){B pr.stat(x);}
-dv* out;U32 low,dg;P pr;cz<bf> buf;N encode(I y,I p){U32 mid=low+U32(((dg-low)*U64(U32(p)))>>16);O(y)dg=mid;Y low=mid+1;ba((dg^low)<0x1000000){out->put(dg>>24);dg=dg<<8|255;low=low<<8;low+=(low==0);}}};V Compiler{Compiler(J bf* in,I* bn,ZP&hz,ZP&pz);J bf* in;I* bn;ZP&hz,&pz;I line,bz;typedef enum{NONE,CONS,CM,ICM,MATCH,AVG,MIX2,MIX,ISSE,SSE,JT=39,JF=47,JMP=63,LJ=255,POST=256,PCOMP,END,IF,IFNOT,ELSE,ENDIF,DO,WHILE,UNTIL,QEVER,IFL,IFNOTL,ELSEL,SEMICOLON}CompType;N bE(){Q(;*in;++in){O(*in=='\n')++line;O(*in=='(')bz+=1+(bz<0);Y O(bz>0&&*in==')')--bz;Y O(bz<0&&*in<=' ')bz=0;Y O(bz==0&&*in>' '){bz=-1;g;}}}cN matchToken(J bf* word){J bf* a=in;Q(;(*a>' '&&*a!='('&&*word);++a,++word)
-O(tolower(*a)!=tolower(*word))B false;B !*word&&(*a<=' '||*a=='(');}I rtoken(I low,I dg){bE();I r=0;O(in[0]=='$'&&in[1]>='1'&&in[1]<='9'){O(in[2]=='+')r=atoi(in+3);O(bn)r+=bn[in[1]-'1'];}Y O(in[0]=='-'||(in[0]>='0'&&in[0]<='9'))r=atoi(in);B r;}I rtoken(J bf* list[]){bE();Q(I i=0;list[i];++i)
-O(matchToken(list[i]))
-B i;E(0);B -1;}I compile_comp(ZP&z);V Stack{LQ::cz<U16> s;bq top;Stack(I n):s(n),top(0){}N push(J U16&x){O(top>=s.be())E(0);s[top++]=x;}U16 pop(){O(top<=0)E(0);B s[--top];}};Stack dl,do_stack;};V C{C(cY* i,dv* out):enc(z),in(i),bz(INIT){enc.out=out;}
-N startBlock(J bf* config,I* bn){Compiler(config,bn,z,pz);enc.out->put(1+(z.D[6]==0));z.bx(enc.out,false);bz=BLOCK1;}N startSegment(){O(bz==BLOCK1)bz=SEG1;O(bz==BLOCK2)bz=SEG2;}N postProcess(J bf* pcomp=0,I len=0);cN compress(I n=-1);N endSegment(){O(bz==SEG1)
-postProcess();enc.compress(-1);enc.out->put(0);enc.out->put(0);enc.out->put(0);enc.out->put(0);enc.out->put(254);bz=BLOCK2;}I stat(I x){B enc.stat(x);}
-ZP z,pz;Encoder enc;cY* in;enum{INIT,BLOCK1,SEG1,BLOCK2,SEG2}bz;};V SB:cY,dv{G bf* p;bq al,bH,bR,bP,df;N reserve(bq a){O(a<=al)B;G bf* q=0;O(a>0)q=(G bf*)(p ? realloc(p,a):malloc(a));O(a>0&&!q)E(0);p=q;al=a;}N lengthen(bq n){O(bH+n<=al)B;bq a=al;ba(bH+n>=a)a=a*2+df;reserve(a);}N operator=(J SB&);SB(J SB&);G bf* bj(){B p;}
-SB(bq n=0):p(0),al(0),bH(0),bR(0),bP(bq(-1)),df(n>128?n:128){}~SB(){O(p)free(p);}
-bq be()J{B bH;}
-N put(I c){lengthen(1);p[bH++]=c;}N bx(J bf* buf,I n){O(n<1)B;lengthen(n);O(buf)memcpy(p+bH,buf,n);bH+=n;}I get(){B bR<bH ? p[bR++]:-1;}I read(bf* buf,I n){O(bR+n>bH)n=bH-bR;O(n>0&&buf)memcpy(buf,p+bR,n);bR+=n;B n;}J bf* c_str()J{B(J bf*)p;}
-N bm(bq i){bH=i;O(bR>bH)bR=bH;}N swap(SB&s){::swap(p,s.p);::swap(al,s.al);::swap(bH,s.bH);::swap(bR,s.bR);::swap(bP,s.bP);}};double pow2(I x){double r=1;Q(;x>0;x--)r+=r;B r;}U8 stdt[712]={64,128,128,128,128,128,127,128,127,128,127,127,127,127,126,126,126,126,126,125,125,124,125,124,123,123,123,123,122,122,121,121,120,120,119,119,118,118,118,116,117,115,116,114,114,113,113,112,112,111,110,110,109,108,108,107,106,106,105,104,104,102,103,101,101,100,99,98,98,97,96,96,94,94,94,92,92,91,90,89,89,88,87,86,86,84,84,84,82,82,81,80,79,79,78,77,76,76,75,74,73,73,72,71,70,70,69,68,67,67,66,65,65,64,63,62,62,61,61,59,59,59,57,58,56,56,55,54,54,53,52,52,51,51,50,49,49,48,48,47,47,45,46,44,45,43,43,43,42,41,41,40,40,40,39,38,38,37,37,36,36,36,35,34,34,34,33,32,33,32,31,31,30,31,29,30,28,29,28,28,27,27,27,26,26,25,26,24,25,24,24,23,23,23,23,22,22,21,22,21,20,21,20,19,20,19,19,19,18,18,18,18,17,17,17,17,16,16,16,16,15,15,15,15,15,14,14,14,14,13,14,13,13,13,12,13,12,12,12,11,12,11,11,11,11,11,10,11,10,10,10,10,9,10,9,9,9,9,9,8,9,8,9,8,8,8,7,8,8,7,7,8,7,7,7,6,7,7,6,6,7,6,6,6,6,6,6,5,6,5,6,5,5,5,5,5,5,5,5,5,4,5,4,5,4,4,5,4,4,4,4,4,4,3,4,4,3,4,4,3,3,4,3,3,3,4,3,3,3,3,3,3,2,3,3,3,2,3,2,3,3,2,2,3,2,2,3,2,2,2,2,3,2,2,2,2,2,2,1,2,2,2,2,1,2,2,2,1,2,1,2,2,1,2,1,2,1,1,2,1,1,2,1,1,2,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,0,1,1,1,0,1,1,1,0,1,1,0,1,1,0,1,0,1,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,1,0,1,0,0,1,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,0,1,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0
-};N P::df(){z.inith();O(!initTables&&isModeled()){initTables=de;dt2k[0]=0;Q(I i=1;i<256;++i){dt2k[i]=2048/i;}F(1024)dt[i]=(1<<17)/(i*2+3)*2;memset(squasht,0,(1376+7)*2);Q(I i=1376+7;i<1376+1344;++i){squasht[i]=(U16)(32768.0 / (1+exp((i-2048)* (-1.0 / 64))));}Q(I i=2720;i<4096;++i)squasht[i]=32767;I k=16384;F(712)
-Q(I j=stdt[i];j>0;--j)
-stretcht[k++]=i;F(16384)stretcht[i]=-stretcht[32767-i];}F(256)h[i]=p[i]=0;F(256)comp[i].df();I n=z.D[6];J U8* cp=&z.D[7];F(n){dj&cr=comp[i];switch(cp[0]){u CONS:p[i]=(cp[1]-128)*4;g;u CM:cr.cm.bm(1,cp[1]);cr.z=cp[2]*4;Q(bq j=0;j<cr.cm.be();++j)
-cr.cm[j]=0x80000000;g;u ICM:cr.z=1023;cr.cm.bm(256);cr.ht.bm(64,cp[1]);Q(bq j=0;j<cr.cm.be();++j)
-cr.cm[j]=st.cminit(j);g;u MATCH:cr.cm.bm(1,cp[1]);cr.ht.bm(1,cp[2]);cr.ht(0)=1;g;u AVG:g;u MIX2:cr.c=(bq(1)<<cp[1]);cr.a16.bm(1,cp[1]);Q(bq j=0;j<cr.a16.be();++j)
-cr.a16[j]=32768;g;u MIX:{I m=cp[3];cr.c=(bq(1)<<cp[1]);cr.cm.bm(m,cp[1]);Q(bq j=0;j<cr.cm.be();++j)
-cr.cm[j]=65536/m;g;}u ISSE:cr.ht.bm(64,cp[1]);cr.cm.bm(512);Q(I j=0;j<256;++j){cr.cm[j*2]=1<<15;cr.cm[j*2+1]=clamp512k(stretch(st.cminit(j)>>8)*1024);}g;u SSE:cr.cm.bm(32,cp[1]);cr.z=cp[4]*4;Q(bq j=0;j<cr.cm.be();++j)
-cr.cm[j]=squash((j&31)*64-992)<<17|cp[3];g;default:E(0);}cp+=compsize[*cp];}}I P::predict(){I n=z.D[6];J U8* cp=&z.D[7];F(n){dj&cr=comp[i];switch(cp[0]){u CONS:g;u CM:cr.cxt=h[i]^dk;p[i]=stretch(cr.cm(cr.cxt)>>17);g;u ICM:O(c8==1||(c8&0xf0)==16)cr.c=find(cr.ht,cp[1]+2,h[i]+16*c8);cr.cxt=cr.ht[cr.c+(dk&15)];p[i]=stretch(cr.cm(cr.cxt)>>8);g;u MATCH:O(cr.a==0)p[i]=0;Y{cr.c=(cr.ht(cr.z-cr.b)>>(7-cr.cxt))&1;p[i]=stretch(dt2k[cr.a]*(cr.c*-2+1)&32767);}g;u AVG:p[i]=(p[cp[1]]*cp[3]+p[cp[2]]*(256-cp[3]))>>8;g;u MIX2:{cr.cxt=((h[i]+(c8&cp[5]))&(cr.c-1));I w=cr.a16[cr.cxt];p[i]=(w*p[cp[2]]+(65536-w)*p[cp[3]])>>16;}g;u MIX:{I m=cp[3];cr.cxt=h[i]+(c8&cp[5]);cr.cxt=(cr.cxt&(cr.c-1))*m;I* wt=(I*)&cr.cm[cr.cxt];p[i]=0;Q(I j=0;j<m;++j)
-p[i]+=(wt[j]>>8)*p[cp[2]+j];p[i]=clamp2k(p[i]>>8);}g;u ISSE:{O(c8==1||(c8&0xf0)==16)
-cr.c=find(cr.ht,cp[1]+2,h[i]+16*c8);cr.cxt=cr.ht[cr.c+(dk&15)];I*wt=(I*)&cr.cm[cr.cxt*2];p[i]=clamp2k((wt[0]*p[cp[2]]+wt[1]*64)>>16);}g;u SSE:{cr.cxt=(h[i]+c8)*32;I pq=p[cp[2]]+992;O(pq<0)pq=0;O(pq>1983)pq=1983;I wt=pq&63;pq>>=6;cr.cxt+=pq;p[i]=stretch(((cr.cm(cr.cxt)>>10)*(64-wt)+(cr.cm(cr.cxt+1)>>10)*wt)>>13);cr.cxt+=wt>>5;}g;default:E(0);}cp+=compsize[cp[0]];}B squash(p[n-1]);}N P::update(I y){J U8* cp=&z.D[7];I n=z.D[6];F(n){dj&cr=comp[i];switch(cp[0]){u CONS:g;u CM:train(cr,y);g;u ICM:{cr.ht[cr.c+(dk&15)]=st.bE(cr.ht[cr.c+(dk&15)],y);U32&pn=cr.cm(cr.cxt);pn+=I(y*32767-(pn>>8))>>2;}g;u MATCH:{O(I(cr.c)!=y)cr.a=0;cr.ht(cr.z)+=cr.ht(cr.z)+y;O(++cr.cxt==8){cr.cxt=0;++cr.z;cr.z&=(1<<cp[2])-1;O(cr.a==0){cr.b=cr.z-cr.cm(h[i]);O(cr.b&(cr.ht.be()-1))
-ba(cr.a<255
-&&cr.ht(cr.z-cr.a-1)==cr.ht(cr.z-cr.a-cr.b-1))
-++cr.a;}Y cr.a+=cr.a<255;cr.cm(h[i])=cr.z;}}g;u AVG:g;u MIX2:{I err=(y*32767-squash(p[i]))*cp[4]>>5;I w=cr.a16[cr.cxt];w+=(err*(p[cp[2]]-p[cp[3]])+(1<<12))>>13;O(w<0)w=0;O(w>65535)w=65535;cr.a16[cr.cxt]=w;}g;u MIX:{I m=cp[3];I err=(y*32767-squash(p[i]))*cp[4]>>4;I* wt=(I*)&cr.cm[cr.cxt];Q(I j=0;j<m;++j)
-wt[j]=clamp512k(wt[j]+((err*p[cp[2]+j]+(1<<12))>>13));}g;u ISSE:{I err=y*32767-squash(p[i]);I*wt=(I*)&cr.cm[cr.cxt*2];wt[0]=clamp512k(wt[0]+((err*p[cp[2]]+(1<<12))>>13));wt[1]=clamp512k(wt[1]+((err+16)>>5));cr.ht[cr.c+(dk&15)]=st.bE(cr.cxt,y);}g;u SSE:train(cr,y);g;default:assert(0);}cp+=compsize[cp[0]];}c8+=c8+y;O(c8>=256){z.run(c8-256);dk=1;c8=1;F(n)h[i]=z.H(i);}Y O(c8>=16&&c8<32)
-dk=(dk&0xf)<<5|y<<4|1;Y
-dk=(dk&0x1f0)|(((dk&0xf)*2+y)&0xf);}J bf*compname[256]={"","J","cm","icm","match","avg","mix2","mix","isse","sse",0};J bf*opcodelist[272]={"E","a++","a--","a!","a=0","","","a=r","b<>a","b++","b--","b!","b=0","","","b=r","c<>a","c++","c--","c!","c=0","","","c=r","d<>a","d++","d--","d!","d=0","","","d=r","*b<>a","*b++","*b--","*b!","*b=0","","","jt","*c<>a","*c++","*c--","*c!","*c=0","","","jf","*d<>a","*d++","*d--","*d!","*d=0","","","r=a","halt","out","","hash","hashd","","","jmp","a=a","a=b","a=c","a=d","a=*b","a=*c","a=*d","a=","b=a","b=b","b=c","b=d","b=*b","b=*c","b=*d","b=","c=a","c=b","c=c","c=d","c=*b","c=*c","c=*d","c=","d=a","d=b","d=c","d=d","d=*b","d=*c","d=*d","d=","*b=a","*b=b","*b=c","*b=d","*b=*b","*b=*c","*b=*d","*b=","*c=a","*c=b","*c=c","*c=d","*c=*b","*c=*c","*c=*d","*c=","*d=a","*d=b","*d=c","*d=d","*d=*b","*d=*c","*d=*d","*d=","","","","","","","","","a+=a","a+=b","a+=c","a+=d","a+=*b","a+=*c","a+=*d","a+=","a-=a","a-=b","a-=c","a-=d","a-=*b","a-=*c","a-=*d","a-=","a*=a","a*=b","a*=c","a*=d","a*=*b","a*=*c","a*=*d","a*=","a/=a","a/=b","a/=c","a/=d","a/=*b","a/=*c","a/=*d","a/=","a%=a","a%=b","a%=c","a%=d","a%=*b","a%=*c","a%=*d","a%=","a&=a","a&=b","a&=c","a&=d","a&=*b","a&=*c","a&=*d","a&=","a&~a","a&~b","a&~c","a&~d","a&~*b","a&~*c","a&~*d","a&~","a|=a","a|=b","a|=c","a|=d","a|=*b","a|=*c","a|=*d","a|=","a^=a","a^=b","a^=c","a^=d","a^=*b","a^=*c","a^=*d","a^=","a<<=a","a<<=b","a<<=c","a<<=d","a<<=*b","a<<=*c","a<<=*d","a<<=","a>>=a","a>>=b","a>>=c","a>>=d","a>>=*b","a>>=*c","a>>=*d","a>>=","a==a","a==b","a==c","a==d","a==*b","a==*c","a==*d","a==","a<a","a<b","a<c","a<d","a<*b","a<*c","a<*d","a<","a>a","a>b","a>c","a>d","a>*b","a>*c","a>*d","a>","","","","","","","","","","","","","","","","lj","post","pcomp","end","O","ifnot","Y","endif","do","ba","until","Qever","ifl","ifnotl","Yl",";",0};I Compiler::compile_comp(ZP&z){I op=0;J I comp_begin=z.bB;ba(de){op=rtoken(opcodelist);O(op==POST||op==PCOMP||op==END)g;I bT=-1;I operand2=-1;O(op==IF){op=JF;bT=0;dl.push(z.bB+1);}Y O(op==IFNOT){op=JT;bT=0;dl.push(z.bB+1);}Y O(op==IFL||op==IFNOTL){O(op==IFL)z.D[z.bB++]=(JT);O(op==IFNOTL)z.D[z.bB++]=(JF);z.D[z.bB++]=(3);op=LJ;bT=operand2=0;dl.push(z.bB+1);}Y O(op==ELSE||op==ELSEL){O(op==ELSE)op=JMP,bT=0;O(op==ELSEL)op=LJ,bT=operand2=0;I a=dl.pop();O(z.D[a-1]!=LJ){I j=z.bB-a+1+(op==LJ);z.D[a]=j;}Y{I j=z.bB-comp_begin+2+(op==LJ);z.D[a]=j&255;z.D[a+1]=(j>>8)&255;}dl.push(z.bB+1);}Y O(op==ENDIF){I a=dl.pop();I j=z.bB-a-1;O(z.D[a-1]!=LJ){z.D[a]=j;}Y{j=z.bB-comp_begin;z.D[a]=j&255;z.D[a+1]=(j>>8)&255;}}Y O(op==DO){do_stack.push(z.bB);}Y O(op==WHILE||op==UNTIL||op==QEVER){I a=do_stack.pop();I j=a-z.bB-2;O(j>=-127){O(op==WHILE)op=JT;O(op==UNTIL)op=JF;O(op==QEVER)op=JMP;bT=j&255;}Y{j=a-comp_begin;O(op==WHILE){z.D[z.bB++]=(JF);z.D[z.bB++]=(3);}O(op==UNTIL){z.D[z.bB++]=(JT);z.D[z.bB++]=(3);}op=LJ;bT=j&255;operand2=j>>8;}}Y O((op&7)==7){O(op==LJ){bT=rtoken(0,65535);operand2=bT>>8;bT&=255;}Y O(op==JT||op==JF||op==JMP){bT=rtoken(-128,127);bT&=255;}Y
-bT=rtoken(0,255);}O(op>=0&&op<=255)
-z.D[z.bB++]=(op);O(bT>=0)
-z.D[z.bB++]=(bT);O(operand2>=0)
-z.D[z.bB++]=(operand2);}z.D[z.bB++]=(0);B op;}Compiler::Compiler(J bf* in_,I* args_,ZP&hz_,ZP&pz_):in(in_),bn(args_),hz(hz_),pz(pz_),dl(1000),do_stack(1000){line=1;bz=0;hz.clear();pz.clear();hz.D.bm(68000);bE();hz.D[2]=rtoken(0,255);hz.D[3]=rtoken(0,255);hz.D[4]=rtoken(0,255);hz.D[5]=rtoken(0,255);J I n=hz.D[6]=rtoken(0,255);hz.ck=7;F(n){rtoken(i,i);CompType bo=CompType(rtoken(compname));hz.D[hz.ck++]=bo;I clen=LQ::compsize[bo&255];Q(I j=1;j<clen;++j)
-hz.D[hz.ck++]=rtoken(0,255);}hz.D[hz.ck++];hz.bU=hz.bB=hz.ck+128;bE();I op=compile_comp(hz);I cv=hz.ck-2+hz.bB-hz.bU;hz.D[0]=cv&255;hz.D[1]=cv>>8;O(op==POST){rtoken(0,0);bE();}Y O(op==PCOMP){pz.D.bm(68000);pz.D[4]=hz.D[4];pz.D[5]=hz.D[5];pz.ck=8;pz.bU=pz.bB=pz.ck+128;bE();ba(*in&&*in!=';'){++in;}O(*in)++in;op=compile_comp(pz);I len=pz.ck-2+pz.bB-pz.bU;pz.D[0]=len&255;pz.D[1]=len>>8;}}V MemoryReader:cY{J bf* p;MemoryReader(J bf* p_):p(p_){}I get(){B *p++&255;}};N C::postProcess(J bf* pcomp,I len){O(bz==SEG2)B;enc.df();O(!pcomp){len=pz.bB-pz.bU;O(len>0){pcomp=(J bf*)&pz.D[pz.bU];}}Y O(len==0){len=toU16(pcomp);pcomp+=2;}O(len>0){enc.compress(1);enc.compress(len&255);enc.compress((len>>8)&255);F(len)enc.compress(pcomp[i]&255);}Y
-enc.compress(0);bz=SEG2;}cN C::compress(I n){O(bz==SEG1)
-postProcess();J I cI=1<<14;bf buf[cI];ba(n){I nbuf=cI;O(n>=0&&n<nbuf)nbuf=n;I nr=in->read(buf,nbuf);O(nr<=0)B false;O(n>=0)n-=nr;F(nr){I ch=U8(buf[i]);enc.compress(ch);}}B de;}N ZP::run(U32 input){pc=bU;a=input;ba(execute());}
-#define AS 256
-#define BS (AS*AS)
-#define SSIT 8
-#define SSB 1024
-#define TR_STACKSIZE 64
-#define bI(_a,_b)do{t=(_a);(_a)=(_b);(_b)=t;}ba(0)
-#define MIN(_a,_b)(((_a)<(_b))?(_a):(_b))
-#define MAX(_a,_b)(((_a)>(_b))?(_a):(_b))
-#define SP(_a,_b,_c,_d)do{assert(bv<bS);bG[bv].a=(_a),bG[bv].b=(_b),bG[bv].c=(_c),bG[bv++].d=(_d);}ba(0)
-#define S5(_a,_b,_c,_d,_e)do{assert(bv<bS);bG[bv].a=(_a),bG[bv].b=(_b),bG[bv].c=(_c),bG[bv].d=(_d),bG[bv++].e=(_e);}ba(0)
-#define STACK_POP(_a,_b,_c,_d)do{assert(0<=bv);O(bv==0){B;}(_a)= bG[--bv].a,(_b)= bG[bv].b,(_c)= bG[bv].c,(_d)= bG[bv].d;}ba(0)
-#define cj(_a,_b,_c,_d,_e)do{assert(0<=bv);O(bv==0){B;}(_a)= bG[--bv].a,(_b)= bG[bv].b,(_c)= bG[bv].c,(_d)= bG[bv].d,(_e)= bG[bv].e;}ba(0)
-#define cT(_c0)cC[(_c0)]
-#define cq(_c0,_c1)(ct[((_c1)<<8)|(_c0)])
-#define BB(_c0,_c1)(ct[((_c0)<<8)|(_c1)])
-#define R(v)v,v,v,v,v,v,v,v,v,v,v,v,v,v,v,v
-J I cu[256]={-1,0,1,1,2,2,2,2,3,3,3,3,3,3,3,3,R(4),R(5),R(5),R(6),R(6),R(6),R(6),R(7),R(7),R(7),R(7),R(7),R(7),R(7),R(7),};
-#undef R
-I cZ(I n){B(n&0xff00)?
-8+cu[(n >> 8)&0xff]:0+cu[(n >> 0)&0xff];}I dqq_table[256] ={0};I ss_isqrt(I x){I y,e;O(x >= (SSB * SSB)){B SSB;}
-e=(x&0xffff0000)?
-((x&0xff000000)?
-24+cu[(x >> 24)&0xff]:16+cu[(x >> 16)&0xff]):((x&0x0000ff00)?
-8+cu[(x >> 8)&0xff]:0+cu[(x >> 0)&0xff]);O(dqq_table[255] != 255){Q(I i=0;i<256;++i){dqq_table[i]=(I)(16 * sqrt(i));}}O(e >= 16){y=dqq_table[x >> ((e-6)- (e&1))] << ((e >> 1)- 7);O(e >= 24){y=(y+1+x / y)>> 1;}
-y=(y+1+x / y)>> 1;}Y O(e >= 8){y=(dqq_table[x >> ((e-6)- (e&1))] >> (7-(e >> 1)))+ 1;}Y{B dqq_table[x] >> 4;}B(x<(y * y))? y-1:y;}I bW(J G bf*T,J I*p1,J I*p2,I W){J G bf*U1,*U2,*U1n,*U2n;Q(U1=T+W+*p1,U2=T+W+*p2,U1n=T+*(p1+1)+ 2,U2n=T+*(p2+1)+ 2;(U1<U1n)&&(U2<U2n)&&(*U1==*U2);++U1,++U2){}B U1<U1n ?
-(U2<U2n ? *U1-*U2:1):(U2<U2n ? -1:0);}N ss_insertionsort(J G bf*T,J I*PA,I*F,I*L,I W){I*i,*j,t,r;Q(i=L-2;F<=i;--i){Q(t=*i,j=i+1;0<(r=bW(T,PA+t,PA+*j,W));){do{*(j-1)= *j;}ba((++j<L)&&(*j<0));O(L<=j){g;}}O(r==0){*j=~*j;}
-*(j-1)= t;}}N ss_fixdown(J G bf*Td,J I*PA,I*SA,I i,I be){I j,k,v,c,d,e;Q(v=SA[i],c=Td[PA[v]];(j=2 * i+1)< be;SA[i]=SA[k],i=k){d=Td[PA[SA[k=j++]]];O(d<(e=Td[PA[SA[j]]])){k=j;d=e;}
-O(d<=c){g;}}SA[i]=v;}N ss_heapsort(J G bf*Td,J I*PA,I*SA,I be){I i,m,t;m=be;O((be % 2)== 0){m--;O(Td[PA[SA[m / 2]]]<Td[PA[SA[m]]]){bI(SA[m],SA[m / 2]);}}Q(i=m / 2-1;0<=i;--i){ss_fixdown(Td,PA,SA,i,m);}
-O((be % 2)== 0){bI(SA[0],SA[m]);ss_fixdown(Td,PA,SA,0,m);}
-Q(i=m-1;0<i;--i){t=SA[0],SA[0]=SA[i];ss_fixdown(Td,PA,SA,0,i);SA[i]=t;}}I*dA(J G bf*Td,J I*PA,I*v1,I*v2,I*v3){I*t;O(Td[PA[*v1]]>Td[PA[*v2]]){bI(v1,v2);}
-O(Td[PA[*v2]]>Td[PA[*v3]]){O(Td[PA[*v1]]>Td[PA[*v3]]){B v1;}
-Y{B v3;}}B v2;}I*ss_median5(J G bf*Td,J I*PA,I*v1,I*v2,I*v3,I*v4,I*v5){I*t;O(Td[PA[*v2]]>Td[PA[*v3]]){bI(v2,v3);}
-O(Td[PA[*v4]]>Td[PA[*v5]]){bI(v4,v5);}
-O(Td[PA[*v2]]>Td[PA[*v4]]){bI(v2,v4);bI(v3,v5);}
-O(Td[PA[*v1]]>Td[PA[*v3]]){bI(v1,v3);}
-O(Td[PA[*v1]]>Td[PA[*v4]]){bI(v1,v4);bI(v3,v5);}
-O(Td[PA[*v3]]>Td[PA[*v4]]){B v4;}
-B v3;}I*ss_pivot(J G bf*Td,J I*PA,I*F,I*L){I*M;I t;t=L-F;M=F+t / 2;O(t<=512){O(t<=32){B dA(Td,PA,F,M,L-1);}Y{t >>= 2;B ss_median5(Td,PA,F,F+t,M,L-1-t,L-1);}}t >>= 3;F=dA(Td,PA,F,F+t,F+(t << 1));M=dA(Td,PA,M-t,M,M+t);L=dA(Td,PA,L-1-(t << 1),L-1-t,L-1);B dA(Td,PA,F,M,L);}I*ss_partition(J I*PA,I*F,I*L,I W){I*a,*b,t;Q(a=F-1,b=L;;){Q(;(++a<b)&&((PA[*a]+W)>= (PA[*a+1]+1));){*a=~*a;}
-Q(;(a<--b)&&((PA[*b]+W)<(PA[*b+1]+1));){}O(b<=a){g;}
-t=~*b;*b=*a;*a=t;}O(F<a){*F=~*F;}
-B a;}N ss_mIrosort(J G bf*T,J I*PA,I*F,I*L,I W){
-#define bS 16
-V{I*a,*b,c,d;}bG[bS];J G bf*Td;I*a,*b,*c,*d,*e,*f,s,t,bv,bP,v,x=0;Q(bv=0,bP=cZ(L-F);;){O((L-F)<= SSIT){O(1<(L-F)){ss_insertionsort(T,PA,F,L,W);}
-STACK_POP(F,L,W,bP);dm;}Td=T+W;O(bP--==0){ss_heapsort(Td,PA,F,L-F);}
-O(bP<0){Q(a=F+1,v=Td[PA[*F]];a<L;++a){O((x=Td[PA[*a]])!= v){O(1<(a-F)){g;}
-v=x;F=a;}}O(Td[PA[*F]-1]<v){F=ss_partition(PA,F,a,W);}O((a-F)<= (L-a)){O(1<(a-F)){SP(a,L,W,-1);L=a,W+=1,bP=cZ(a-F);}Y{F=a,bP=-1;}}Y{O(1<(L-a)){SP(F,a,W+1,cZ(a-F));F=a,bP=-1;}Y{L=a,W+=1,bP=cZ(a-F);}}dm;}a=ss_pivot(Td,PA,F,L);v=Td[PA[*a]];bI(*F,*a);Q(b=F;(++b<L)&&((x=Td[PA[*b]])== v);){}O(((a=b)< L)&&(x<v)){Q(;(++b<L)&&((x=Td[PA[*b]])<= v);){O(x==v){bI(*b,*a);++a;}}}Q(c=L;(b<--c)&&((x=Td[PA[*c]])== v);){}O((b<(d=c))&&(x > v)){Q(;(b<--c)&&((x=Td[PA[*c]])>= v);){O(x==v){bI(*c,*d);--d;}}}Q(;b<c;){bI(*b,*c);Q(;(++b<c)&&((x=Td[PA[*b]])<= v);){O(x==v){bI(*b,*a);++a;}}Q(;(b<--c)&&((x=Td[PA[*c]])>= v);){O(x==v){bI(*c,*d);--d;}}}O(a<=d){c=b-1;O((s=a-F)>(t=b-a)){s=t;}
-Q(e=F,f=b-s;0<s;--s,++e,++f){bI(*e,*f);}
-O((s=d-c)>(t=L-d-1)){s=t;}
-Q(e=b,f=L-s;0<s;--s,++e,++f){bI(*e,*f);}
-a=F+(b-a),c=L-(d-c);b=(v<=Td[PA[*a]-1])? a:ss_partition(PA,a,c,W);O((a-F)<= (L-c)){O((L-c)<= (c-b)){SP(b,c,W+1,cZ(c-b));SP(c,L,W,bP);L=a;}Y O((a-F)<= (c-b)){SP(c,L,W,bP);SP(b,c,W+1,cZ(c-b));L=a;}Y{SP(c,L,W,bP);SP(F,a,W,bP);F=b,L=c,W+=1,bP=cZ(c-b);}}Y{O((a-F)<= (c-b)){SP(b,c,W+1,cZ(c-b));SP(F,a,W,bP);F=c;}Y O((L-c)<= (c-b)){SP(F,a,W,bP);SP(b,c,W+1,cZ(c-b));F=c;}Y{SP(F,a,W,bP);SP(c,L,W,bP);F=b,L=c,W+=1,bP=cZ(c-b);}}}Y{bP+=1;O(Td[PA[*F]-1]<v){F=ss_partition(PA,F,L,W);bP=cZ(L-F);}W+=1;}}
-#undef bS
-}N
-dw(I*a,I*b,I n){I t;Q(;0<n;--n,++a,++b){t=*a,*a=*b,*b=t;}}N
-ss_rotate(I*F,I*M,I*L){I*a,*b,t;I l,r;l=M-F,r=L-M;Q(;(0<l)&&(0<r);){O(l==r){dw(F,M,l);g;}
-O(l<r){a=L-1,b=M-1;t=*a;do{*a--=*b,*b--=*a;O(b<F){*a=t;L=a;O((r-=l+1)<= l){g;}
-a-=1,b=M-1;t=*a;}}ba(1);}Y{a=F,b=M;t=*a;do{*a++=*b,*b++=*a;O(L<=b){*a=t;F=a+1;O((l-=r+1)<= r){g;}
-a+=1,b=M;t=*a;}}ba(1);}}}N
-ss_inplacemerge(J G bf*T,J I*PA,I*F,I*M,I*L,I W){J I*p;I*a,*b;I len,half;I q,r;I x;Q(;;){O(*(L-1)< 0){x=1;p=PA+~*(L-1);}
-Y{x=0;p=PA+*(L-1);}
-Q(a=F,len=M-F,half=len >> 1,r=-1;0<len;len=half,half >>= 1){b=a+half;q=bW(T,PA+((0<=*b)? *b:~*b),p,W);O(q<0){a=b+1;half-=(len&1)^ 1;}Y{r=q;}}O(a<M){O(r==0){*a=~*a;}
-ss_rotate(a,M,L);L-=M-a;M=a;O(F==M){g;}}--L;O(x != 0){ba(*--L<0){}}
-O(M==L){g;}}}N
-ss_mergeQward(J G bf*T,J I*PA,I*F,I*M,I*L,I*buf,I W){I*a,*b,*c,*cD;I t,r;cD=buf+(M-F)- 1;dw(buf,F,M-F);Q(t=*(a=F),b=buf,c=M;;){r=bW(T,PA+*b,PA+*c,W);O(r<0){do{*a++=*b;O(cD<=b){*cD=t;B;}
-*b++=*a;}ba(*b<0);}Y O(r > 0){do{*a++=*c,*c++=*a;O(L<=c){ba(b<cD){*a++=*b,*b++=*a;}
-*a=*b,*b=t;B;}}ba(*c<0);}Y{*c=~*c;do{*a++=*b;O(cD<=b){*cD=t;B;}
-*b++=*a;}ba(*b<0);do{*a++=*c,*c++=*a;O(L<=c){ba(b<cD){*a++=*b,*b++=*a;}
-*a=*b,*b=t;B;}}ba(*c<0);}}}static
-N
-ss_mergebackward(J G bf*T,J I*PA,I*F,I*M,I*L,I*buf,I W){J I*p1,*p2;I*a,*b,*c,*cD;I t;I r;I x;cD=buf+(L-M)- 1;dw(buf,M,L-M);x=0;O(*cD<0){p1=PA+~*cD;x |= 1;}
-Y{p1=PA+*cD;}
-O(*(M-1)< 0){p2=PA+~*(M-1);x |= 2;}
-Y{p2=PA+*(M-1);}
-Q(t=*(a=L-1),b=cD,c=M-1;;){r=bW(T,p1,p2,W);O(0<r){O(x&1){do{*a--=*b,*b--=*a;}ba(*b<0);x^=1;}
-*a--=*b;O(b<=buf){*buf=t;g;}
-*b--=*a;O(*b<0){p1=PA+~*b;x |= 1;}
-Y{p1=PA+*b;}}Y O(r<0){O(x&2){do{*a--=*c,*c--=*a;}ba(*c<0);x^=2;}
-*a--=*c,*c--=*a;O(c<F){ba(buf<b){*a--=*b,*b--=*a;}
-*a=*b,*b=t;g;}O(*c<0){p2=PA+~*c;x |= 2;}
-Y{p2=PA+*c;}}Y{O(x&1){do{*a--=*b,*b--=*a;}ba(*b<0);x^=1;}
-*a--=~*b;O(b<=buf){*buf=t;g;}
-*b--=*a;O(x&2){do{*a--=*c,*c--=*a;}ba(*c<0);x^=2;}
-*a--=*c,*c--=*a;O(c<F){ba(buf<b){*a--=*b,*b--=*a;}
-*a=*b,*b=t;g;}O(*b<0){p1=PA+~*b;x |= 1;}
-Y{p1=PA+*b;}
-O(*c<0){p2=PA+~*c;x |= 2;}
-Y{p2=PA+*c;}}}}N
-ss_swapmerge(J G bf*T,J I*PA,I*F,I*M,I*L,I*buf,I ci,I W){
-#define bS 32
-#define GETIDX(a)((0<=(a))? (a):(~(a)))
-#define MERGE_(a,b,c)\
-do{\
-O(((c)&1)||\
-(((c)&2)&&(bW(T,PA+GETIDX(*((a)- 1)),PA+*(a),W)== 0))){\
-*(a)= ~*(a);\
-}\
-O(((c)&4)&&((bW(T,PA+GETIDX(*((b)- 1)),PA+*(b),W)== 0))){\
-*(b)= ~*(b);\
-}\
-}ba(0)
-V{I*a,*b,*c;I d;}bG[bS];I*l,*r,*lm,*rm;I m,len,half,bv,dn,bE;Q(dn=0,bv=0;;){O((L-M)<= ci){O((F<M)&&(M<L)){ss_mergebackward(T,PA,F,M,L,buf,W);}MERGE_(F,L,dn);STACK_POP(F,M,L,dn);dm;}O((M-F)<= ci){O(F<M){ss_mergeQward(T,PA,F,M,L,buf,W);}MERGE_(F,L,dn);STACK_POP(F,M,L,dn);dm;}Q(m=0,len=MIN(M-F,L-M),half=len >> 1;0<len;len=half,half >>= 1){O(bW(T,PA+GETIDX(*(M+m+half)),PA+GETIDX(*(M-m-half-1)),W)< 0){m+=half+1;half-=(len&1)^ 1;}}O(0<m){lm=M-m,rm=M+m;dw(lm,M,m);l=r=M,bE=0;O(rm<L){O(*rm<0){*rm=~*rm;O(F<lm){Q(;*--l<0;){}bE |= 4;}
-bE |= 1;}Y O(F<lm){Q(;*r<0;++r){}bE |= 2;}}O((l-F)<= (L-r)){SP(r,rm,L,(bE&3)|(dn&4));M=lm,L=l,dn=(dn&3)|(bE&4);}Y{O((bE&2)&&(r==M)){bE^=6;}
-SP(F,lm,l,(dn&3)|(bE&4));F=r,M=rm,dn=(bE&3)|(dn&4);}}Y{O(bW(T,PA+GETIDX(*(M-1)),PA+*M,W)== 0){*M=~*M;}MERGE_(F,L,dn);STACK_POP(F,M,L,dn);}}
-#undef bS
-}N sssort(J G bf*T,J I*PA,I*F,I*L,I*buf,I ci,I W,I n,I Lsuffix){I*a;I*b,*M,*curbuf;I j,k,curbufsize,Z;I i;O(Lsuffix != 0){++F;}
-O((ci<SSB)&&
-(ci<(L-F))&&
-(ci<(Z=ss_isqrt(L-F)))){O(SSB<Z){Z=SSB;}
-buf=M=L-Z,ci=Z;}Y{M=L,Z=0;}Q(a=F,i=0;SSB<(M-a);a+=SSB,++i){ss_mIrosort(T,PA,a,a+SSB,W);curbufsize=L-(a+SSB);curbuf=a+SSB;O(curbufsize<=ci){curbufsize=ci,curbuf=buf;}
-Q(b=a,k=SSB,j=i;j&1;b-=k,k <<= 1,j >>= 1){ss_swapmerge(T,PA,b-k,b,b+k,curbuf,curbufsize,W);}}ss_mIrosort(T,PA,a,M,W);Q(k=SSB;i != 0;k <<= 1,i >>= 1){O(i&1){ss_swapmerge(T,PA,a-k,a,M,buf,ci,W);a-=k;}}O(Z != 0){ss_mIrosort(T,PA,M,L,W);ss_inplacemerge(T,PA,F,M,L,W);}O(Lsuffix != 0){I PAi[2];PAi[0]=PA[*(F-1)],PAi[1]=n-2;Q(a=F,i=*(F-1);(a<L)&&((*a<0)|| (0<bW(T,&(PAi[0]),PA+*a,W)));++a){*(a-1)= *a;}*(a-1)= i;}}I da(I n){B(n&0xffff0000)?
-((n&0xff000000)?
-24+cu[(n >> 24)&0xff]:16+cu[(n >> 16)&0xff]):((n&0x0000ff00)?
-8+cu[(n >> 8)&0xff]:0+cu[(n >> 0)&0xff]);}N tr_insertionsort(J I*X,I*F,I*L){I*a,*b;I t,r;Q(a=F+1;a<L;++a){Q(t=*a,b=a-1;0 > (r=X[t]-X[*b]);){do{*(b+1)= *b;}ba((F<=--b)&&(*b<0));O(b<F){g;}}O(r==0){*b=~*b;}
-*(b+1)= t;}}N tr_fixdown(J I*X,I*SA,I i,I be){I j,k,v,c,d,e;Q(v=SA[i],c=X[v];(j=2 * i+1)< be;SA[i]=SA[k],i=k){d=X[SA[k=j++]];O(d<(e=X[SA[j]])){k=j;d=e;}
-O(d<=c){g;}}SA[i]=v;}N tr_heapsort(J I*X,I*SA,I be){I i,m,t;m=be;O((be % 2)== 0){m--;O(X[SA[m / 2]]<X[SA[m]]){bI(SA[m],SA[m / 2]);}}Q(i=m / 2-1;0<=i;--i){tr_fixdown(X,SA,i,m);}
-O((be % 2)== 0){bI(SA[0],SA[m]);tr_fixdown(X,SA,0,m);}
-Q(i=m-1;0<i;--i){t=SA[0],SA[0]=SA[i];tr_fixdown(X,SA,0,i);SA[i]=t;}}I*dB(J I*X,I*v1,I*v2,I*v3){I*t;O(X[*v1]>X[*v2]){bI(v1,v2);}
-O(X[*v2]>X[*v3]){O(X[*v1]>X[*v3]){B v1;}
-Y{B v3;}}B v2;}I*tr_median5(J I*X,I*v1,I*v2,I*v3,I*v4,I*v5){I*t;O(X[*v2]>X[*v3]){bI(v2,v3);}
-O(X[*v4]>X[*v5]){bI(v4,v5);}
-O(X[*v2]>X[*v4]){bI(v2,v4);bI(v3,v5);}
-O(X[*v1]>X[*v3]){bI(v1,v3);}
-O(X[*v1]>X[*v4]){bI(v1,v4);bI(v3,v5);}
-O(X[*v3]>X[*v4]){B v4;}
-B v3;}I*tr_pivot(J I*X,I*F,I*L){I*M,t;t=L-F;M=F+t / 2;O(t<=512){O(t<=32){B dB(X,F,M,L-1);}Y{t >>= 2;B tr_median5(X,F,F+t,M,L-1-t,L-1);}}t >>= 3;F=dB(X,F,F+t,F+(t << 1));M=dB(X,M-t,M,M+t);L=dB(X,L-1-(t << 1),L-1-t,L-1);B dB(X,F,M,L);}V tr{I c,r,i,n;};N trbudget_init(tr *b,I c,I i){b->c=c;b->r=b->i=i;}I trbudget_check(tr *b,I be){O(be<=b->r){b->r-=be;B 1;}
-O(b->c==0){b->n+=be;B 0;}
-b->r+=b->i-be;b->c-=1;B 1;}N tr_partition(J I*X,I*F,I*M,I*L,I**pa,I**pb,I v){I*a,*b,*c,*d,*e,*f,t,s,x=0;Q(b=M-1;(++b<L)&&((x=X[*b])== v);){}O(((a=b)< L)&&(x<v)){Q(;(++b<L)&&((x=X[*b])<= v);){O(x==v){bI(*b,*a);++a;}}}Q(c=L;(b<--c)&&((x=X[*c])== v);){}O((b<(d=c))&&(x > v)){Q(;(b<--c)&&((x=X[*c])>= v);){O(x==v){bI(*c,*d);--d;}}}Q(;b<c;){bI(*b,*c);Q(;(++b<c)&&((x=X[*b])<= v);){O(x==v){bI(*b,*a);++a;}}Q(;(b<--c)&&((x=X[*c])>= v);){O(x==v){bI(*c,*d);--d;}}}O(a<=d){c=b-1;O((s=a-F)>(t=b-a)){s=t;}
-Q(e=F,f=b-s;0<s;--s,++e,++f){bI(*e,*f);}
-O((s=d-c)>(t=L-d-1)){s=t;}
-Q(e=b,f=L-s;0<s;--s,++e,++f){bI(*e,*f);}
-F+=(b-a),L-=(d-c);}*pa=F,*pb=L;}N tr_copy(I*ISA,J I*SA,I*F,I*a,I*b,I*L,I W){I*c,*d,*e,s,v;v=b-SA-1;Q(c=F,d=a-1;c<=d;++c){O((0<=(s=*c-W))&&(ISA[s]==v)){*++d=s;ISA[s]=d-SA;}}Q(c=L-1,e=d+1,d=b;e<d;--c){O((0<=(s=*c-W))&&(ISA[s]==v)){*--d=s;ISA[s]=d-SA;}}}N tr_partialcopy(I*ISA,J I*SA,I*F,I*a,I*b,I*L,I W){I*c,*d,*e,s,v,rank,Lrank,newrank=-1;v=b-SA-1;Lrank=-1;Q(c=F,d=a-1;c<=d;++c){O((0<=(s=*c-W))&&(ISA[s]==v)){*++d=s;rank=ISA[s+W];O(Lrank != rank){Lrank=rank;newrank=d-SA;}
-ISA[s]=newrank;}}Lrank=-1;Q(e=d;F<=e;--e){rank=ISA[*e];O(Lrank != rank){Lrank=rank;newrank=e-SA;}
-O(newrank != rank){ISA[*e]=newrank;}}Lrank=-1;Q(c=L-1,e=d+1,d=b;e<d;--c){O((0<=(s=*c-W))&&(ISA[s]==v)){*--d=s;rank=ISA[s+W];O(Lrank != rank){Lrank=rank;newrank=d-SA;}
-ISA[s]=newrank;}}}N tr_Irosort(I*ISA,J I*X,I*SA,I*F,I*L,tr *T){
-#define bS TR_STACKSIZE
-V{J I*a;I*b,*c;I d,e;}bG[bS];I*a,*b,*c,t,v,x=0,dh=X-ISA,Z,bE,bv,TR=-1;Q(bv=0,Z=da(L-F);;){O(Z<0){O(Z==-1){tr_partition(X-dh,F,F,L,&a,&b,L-SA-1);O(a<L){Q(c=F,v=a-SA-1;c<a;++c){ISA[*c]=v;}}O(b<L){Q(c=a,v=b-SA-1;c<b;++c){ISA[*c]=v;}}O(1<(b-a)){S5(NULL,a,b,0,0);S5(X-dh,F,L,-2,TR);TR=bv-2;}O((a-F)<= (L-b)){O(1<(a-F)){S5(X,b,L,da(L-b),TR);L=a,Z=da(a-F);}Y O(1<(L-b)){F=b,Z=da(L-b);}Y{cj(X,F,L,Z,TR);}}Y{O(1<(L-b)){S5(X,F,a,da(a-F),TR);F=b,Z=da(L-b);}Y O(1<(a-F)){L=a,Z=da(a-F);}Y{cj(X,F,L,Z,TR);}}}Y O(Z==-2){a=bG[--bv].b,b=bG[bv].c;O(bG[bv].d==0){tr_copy(ISA,SA,F,a,b,L,X-ISA);}Y{O(0<=TR){bG[TR].d=-1;}
-tr_partialcopy(ISA,SA,F,a,b,L,X-ISA);}cj(X,F,L,Z,TR);}Y{O(0<=*F){a=F;do{ISA[*a]=a-SA;}ba((++a<L)&&(0<=*a));F=a;}O(F<L){a=F;do{*a=~*a;}ba(*++a<0);bE=(ISA[*a] != X[*a])? da(a-F+1):-1;O(++a<L){Q(b=F,v=a-SA-1;b<a;++b){ISA[*b]=v;}}
-O(trbudget_check(T,a-F)){O((a-F)<= (L-a)){S5(X,a,L,-3,TR);X+=dh,L=a,Z=bE;}Y{O(1<(L-a)){S5(X+dh,F,a,bE,TR);F=a,Z=-3;}Y{X+=dh,L=a,Z=bE;}}}Y{O(0<=TR){bG[TR].d=-1;}
-O(1<(L-a)){F=a,Z=-3;}Y{cj(X,F,L,Z,TR);}}}Y{cj(X,F,L,Z,TR);}}dm;}O((L-F)<= 8){tr_insertionsort(X,F,L);Z=-3;dm;}O(Z--==0){tr_heapsort(X,F,L-F);Q(a=L-1;F<a;a=b){Q(x=X[*a],b=a-1;(F<=b)&&(X[*b]==x);--b){*b=~*b;}}Z=-3;dm;}a=tr_pivot(X,F,L);bI(*F,*a);v=X[*F];tr_partition(X,F,F+1,L,&a,&b,v);O((L-F)!= (b-a)){bE=(ISA[*a] != v)? da(b-a):-1;Q(c=F,v=a-SA-1;c<a;++c){ISA[*c]=v;}
-O(b<L){Q(c=a,v=b-SA-1;c<b;++c){ISA[*c]=v;}}
-O((1<(b-a))&&(trbudget_check(T,b-a))){O((a-F)<= (L-b)){O((L-b)<= (b-a)){O(1<(a-F)){S5(X+dh,a,b,bE,TR);S5(X,b,L,Z,TR);L=a;}Y O(1<(L-b)){S5(X+dh,a,b,bE,TR);F=b;}Y{X+=dh,F=a,L=b,Z=bE;}}Y O((a-F)<= (b-a)){O(1<(a-F)){S5(X,b,L,Z,TR);S5(X+dh,a,b,bE,TR);L=a;}Y{S5(X,b,L,Z,TR);X+=dh,F=a,L=b,Z=bE;}}Y{S5(X,b,L,Z,TR);S5(X,F,a,Z,TR);X+=dh,F=a,L=b,Z=bE;}}Y{O((a-F)<= (b-a)){O(1<(L-b)){S5(X+dh,a,b,bE,TR);S5(X,F,a,Z,TR);F=b;}Y O(1<(a-F)){S5(X+dh,a,b,bE,TR);L=a;}Y{X+=dh,F=a,L=b,Z=bE;}}Y O((L-b)<= (b-a)){O(1<(L-b)){S5(X,F,a,Z,TR);S5(X+dh,a,b,bE,TR);F=b;}Y{S5(X,F,a,Z,TR);X+=dh,F=a,L=b,Z=bE;}}Y{S5(X,F,a,Z,TR);S5(X,b,L,Z,TR);X+=dh,F=a,L=b,Z=bE;}}}Y{O((1<(b-a))&&(0<=TR)){bG[TR].d=-1;}
-O((a-F)<= (L-b)){O(1<(a-F)){S5(X,b,L,Z,TR);L=a;}Y O(1<(L-b)){F=b;}Y{cj(X,F,L,Z,TR);}}Y{O(1<(L-b)){S5(X,F,a,Z,TR);F=b;}Y O(1<(a-F)){L=a;}Y{cj(X,F,L,Z,TR);}}}}Y{O(trbudget_check(T,L-F)){Z=da(L-F),X+=dh;}Y{O(0<=TR){bG[TR].d=-1;}
-cj(X,F,L,Z,TR);}}}
-#undef bS
-}N trsort(I*ISA,I*SA,I n,I W){I*X;I*F,*L;tr b;I t,dz,unsorted;trbudget_init(&b,da(n)* 2 / 3,n);Q(X=ISA+W;-n<*SA;X+=X-ISA){F=SA;dz=0;unsorted=0;do{O((t=*F)< 0){F-=t;dz+=t;}
-Y{O(dz != 0){*(F+dz)= dz;dz=0;}
-L=SA+ISA[t]+1;O(1<(L-F)){b.n=0;tr_Irosort(ISA,X,SA,F,L,&b);O(b.n != 0){unsorted+=b.n;}
-Y{dz=F-L;}}Y O((L-F)== 1){dz=-1;}F=L;}}ba(F<(SA+n));O(dz != 0){*(F+dz)= dz;}
-O(unsorted==0){g;}}}I sort_typeBstar(J G bf*T,I*SA,I*cC,I*ct,I n){I*PAb,*ISAb,*buf,i,j,k,t,m,ci,c0,c1;Q(i=0;i<AS;++i){cC[i]=0;}
-Q(i=0;i<BS;++i){ct[i]=0;}
-Q(i=n-1,m=n,c0=T[n-1];0<=i;){do{++cT(c1=c0);}ba((0<=--i)&&((c0=T[i])>= c1));O(0<=i){++BB(c0,c1);SA[--m]=i;Q(--i,c1=c0;(0<=i)&&((c0=T[i])<= c1);--i,c1=c0){++cq(c0,c1);}}}m=n-m;Q(c0=0,i=0,j=0;c0<AS;++c0){t=i+cT(c0);cT(c0)= i+j;i=t+cq(c0,c0);Q(c1=c0+1;c1<AS;++c1){j+=BB(c0,c1);BB(c0,c1)= j;i+=cq(c0,c1);}}O(0<m){PAb=SA+n-m;ISAb=SA+m;Q(i=m-2;0<=i;--i){t=PAb[i],c0=T[t],c1=T[t+1];SA[--BB(c0,c1)]=i;}t=PAb[m-1],c0=T[t],c1=T[t+1];SA[--BB(c0,c1)]=m-1;buf=SA+m,ci=n-(2 * m);Q(c0=AS-2,j=m;0<j;--c0){Q(c1=AS-1;c0<c1;j=i,--c1){i=BB(c0,c1);O(1<(j-i)){sssort(T,PAb,SA+i,SA+j,buf,ci,2,n,*(SA+i)== (m-1));}}}Q(i=m-1;0<=i;--i){O(0<=SA[i]){j=i;do{ISAb[SA[i]]=i;}ba((0<=--i)&&(0<=SA[i]));SA[i+1]=i-j;O(i<=0){g;}}j=i;do{ISAb[SA[i]=~SA[i]]=j;}ba(SA[--i]<0);ISAb[SA[i]]=j;}trsort(ISAb,SA,m,1);Q(i=n-1,j=m,c0=T[n-1];0<=i;){Q(--i,c1=c0;(0<=i)&&((c0=T[i])>= c1);--i,c1=c0){}O(0<=i){t=i;Q(--i,c1=c0;(0<=i)&&((c0=T[i])<= c1);--i,c1=c0){}SA[ISAb[--j]]=((t==0)|| (1<(t-i)))? t:~t;}}cq(AS-1,AS-1)= n;Q(c0=AS-2,k=m-1;0<=c0;--c0){i=cT(c0+1)- 1;Q(c1=AS-1;c0<c1;--c1){t=i-cq(c0,c1);cq(c0,c1)= i;Q(i=t,j=BB(c0,c1);j<=k;--i,--k){SA[i]=SA[k];}}BB(c0,c0+1)= i-cq(c0,c0)+ 1;cq(c0,c0)= i;}}B m;}N construct_SA(J G bf*T,I*SA,I*cC,I*ct,I n,I m){I*i,*j,*k,s,c0,c1,c2;O(0<m){Q(c1=AS-2;0<=c1;--c1){Q(i=SA+BB(c1,c1+1),j=SA+cT(c1+1)- 1,k=NULL,c2=-1;i<=j;--j){O(0<(s=*j)){*j=~s;c0=T[--s];O((0<s)&&(T[s-1]>c0)){s=~s;}
-O(c0 != c2){O(0<=c2){cq(c2,c1)= k-SA;}
-k=SA+cq(c2=c0,c1);}*k--=s;}Y{*j=~s;}}}}k=SA+cT(c2=T[n-1]);*k++=(T[n-2]<c2)? ~(n-1):(n-1);Q(i=SA,j=SA+n;i<j;++i){O(0<(s=*i)){c0=T[--s];O((s==0)|| (T[s-1]<c0)){s=~s;}
-O(c0 != c2){cT(c2)= k-SA;k=SA+cT(c2=c0);}*k++=s;}Y{*i=~s;}}}I divsufsort(J G bf*T,I*SA,I n){I*cC,*ct;I m;I err=0;O((T==NULL)|| (SA==NULL)|| (n<0)){B -1;}
-Y O(n==0){B 0;}
-Y O(n==1){SA[0]=0;B 0;}
-Y O(n==2){m=(T[0]<T[1]);SA[m ^ 1]=0,SA[m]=1;B 0;}
-cC=(I*)malloc(AS * sizeof(I));ct=(I*)malloc(BS * sizeof(I));O((cC != NULL)&&(ct != NULL)){m=sort_typeBstar(T,SA,cC,ct,n);construct_SA(T,SA,cC,ct,n,m);}Y{err=-2;}free(ct);free(cC);B err;}V LZBuffer:LQ::cY{LQ::cz<G> ht;J G bf* in;I checkbits,level,mBoth;G htsize,n,i,m,m2,maxMatch,maxLiteral,cM,h1,h2,bucket,shift1,shift2,rb,bits,nbits,bR,bH,idx;J G* sa;G* isa;enum{cI=1<<14};G bf buf[cI];N write_literal(G i,G&lit){O(level==1){O(lit<1)B;I ll=lg(lit);putb(0,2);--ll;ba(--ll>=0){putb(1,1);putb((lit>>ll)&1,1);}putb(0,1);ba(lit)putb(in[i-lit--],8);}Y{ba(lit>0){G lit1=lit;O(lit1>64)lit1=64;put(lit1-1);Q(G j=i-lit;j<i-lit+lit1;++j)put(in[j]);lit-=lit1;}}}N write_match(G len,G off);N fill();N putb(G x,I k){x&=(1<<k)-1;bits|=x<<nbits;nbits+=k;ba(nbits>7){buf[bH++]=bits,bits>>=8,nbits-=8;}}N flush(){O(nbits>0)buf[bH++]=bits;bits=nbits=0;}N put(I c){buf[bH++]=c;}LZBuffer(SB&inbuf,I bn[],J G* sap=0):ht((bn[1]&3)==3 ? (inbuf.be()+1)*!sap
-:bn[5]-bn[0]<21 ? 1u<<bn[5]
-:(inbuf.be()*!sap)+(1u<<17<<bn[0])),in(inbuf.bj()),checkbits(bn[5]-bn[0]<21 ? 12-bn[0]:17+bn[0]),level(bn[1]&3),htsize(ht.be()),n(inbuf.be()),i(0),m(bn[2]),m2(bn[3]),maxMatch(cI*3),maxLiteral(cI/4),cM(bn[6]),h1(0),h2(0),bucket((1<<bn[4])-1),shift1(m>0 ? (bn[5]-1)/m+1:1),shift2(m2>0 ? (bn[5]-1)/m2+1:0),mBoth(MAX(m,m2+cM)+4),rb(bn[0]>4 ? bn[0]-4:0),bits(0),nbits(0),bR(0),bH(0),idx(0),sa(0),isa(0){O(bn[5]-bn[0]>=21||level==3){O(sap)
-sa=sap;Y{sa=&ht[0];O(n>0)divsufsort((J G bf*)in,(I*)sa,n);}O(level<3){isa=&ht[n*(sap==0)];}}}I get(){I c=-1;O(bR==bH)fill();O(bR<bH)c=buf[bR++];O(bR==bH)bR=bH=0;B c;}I read(bf* p,I n){O(bR==bH)fill();I nr=n;O(nr>I(bH-bR))nr=bH-bR;O(nr)memcpy(p,buf+bR,nr);bR+=nr;O(bR==bH)bR=bH=0;B nr;}};I nbits(G x){I r;Q(r=0;x;x>>=1)r+=x&1;B r;}N LZBuffer::fill(){G lit=0;J G mask=(1<<checkbits)-1;ba(i<n&&bH*2<cI){G db=m-1;G bp=0;G blit=0;I bscore=0;O(isa){O(sa[isa[i&mask]]!=i)
-Q(G j=0;j<n;++j)
-O((sa[j]&~mask)==(i&~mask))
-isa[sa[j]&mask]=j;Q(G h=0;h<=cM;++h){G q=isa[(h+i)&mask];O(sa[q]!=h+i)dm;Q(I j=-1;j<=1;j+=2){Q(G k=1;k<=bucket;++k){G p;O(q+j*k<n&&(p=sa[q+j*k]-h)<i){G l,l1;Q(l=h;i+l<n&&l<maxMatch&&in[p+l]==in[i+l];++l);Q(l1=h;l1>0&&in[p+l1-1]==in[i+l1-1];--l1);I score=I(l-l1)*8-lg(i-p)-4*(lit==0&&l1>0)-11;Q(G a=0;a<h;++a)score=score*5/8;O(score>bscore)db=l,bp=p,blit=l1,bscore=score;O(l<db||l<m||l>255)g;}}}O(bscore<=0||db<m)g;}}Y O(level==1||m<=64){O(m2>0){Q(G k=0;k<=bucket;++k){G p=ht[h2^k];O(p&&(p&mask)==(in[i+3]&mask)){p>>=checkbits;O(p<i&&i+db<=n&&in[p+db-1]==in[i+db-1]){G l;Q(l=cM;i+l<n&&l<maxMatch&&in[p+l]==in[i+l];++l);O(l>=m2+cM){I l1;Q(l1=cM;l1>0&&in[p+l1-1]==in[i+l1-1];--l1);I score=I(l-l1)*8-lg(i-p)-8*(lit==0&&l1>0)-11;O(score>bscore)db=l,bp=p,blit=l1,bscore=score;}}}O(db>=128)g;}}O(!m2||db<m2){Q(G k=0;k<=bucket;++k){G p=ht[h1^k];O(p&&i+3<n&&(p&mask)==(in[i+3]&mask)){p>>=checkbits;O(p<i&&i+db<=n&&in[p+db-1]==in[i+db-1]){G l;Q(l=0;i+l<n&&l<maxMatch&&in[p+l]==in[i+l];++l);I score=l*8-lg(i-p)-2*(lit>0)-11;O(score>bscore)db=l,bp=p,blit=0,bscore=score;}}O(db>=128)g;}}}J G off=i-bp;O(off>0&&bscore>0
-&&db-blit>=m+(level==2)*((off>=(1<<16))+(off>=(1<<24)))){lit+=blit;write_literal(i+blit,lit);write_match(db-blit,off);}Y{db=1;++lit;}O(isa)
-i+=db;Y{ba(db--){O(i+mBoth<n){G ih=((i*1234547)>>19)&bucket;J G p=(i<<checkbits)|(in[i+3]&mask);O(m2){ht[h2^ih]=p;h2=(((h2*9)<<shift2)
-+(in[i+m2+cM]+1)*23456789u)&(htsize-1);}ht[h1^ih]=p;h1=(((h1*5)<<shift1)+(in[i+m]+1)*123456791u)&(htsize-1);}++i;}}O(lit>=maxLiteral)
-write_literal(i,lit);}O(i==n){write_literal(n,lit);flush();}}N LZBuffer::write_match(G len,G off){O(level==1){I ll=lg(len)-1;off+=(1<<rb)-1;I lo=lg(off)-1-rb;putb((lo+8)>>3,2);putb(lo&7,3);ba(--ll>=2){putb(1,1);putb((len>>ll)&1,1);}putb(0,1);putb(len&3,2);putb(off,rb);putb(off>>rb,lo);}Y{--off;ba(len>0){J G len1=len>m*2+63 ? m+63:len>m+63 ? len-m:len;O(off<(1<<16)){put(64+len1-m);put(off>>8);put(off);}Y O(off<(1<<24)){put(128+len1-m);put(off>>16);put(off>>8);put(off);}Y{put(192+len1-m);put(off>>24);put(off>>16);put(off>>8);put(off);}len-=len1;}}}bD makeConfig(J bf* ME,I bn[]){J bf bo=ME[0];bn[0]=0;bn[1]=0;bn[2]=0;bn[3]=0;bn[4]=0;bn[5]=0;bn[6]=0;bn[7]=0;bn[8]=0;O(isdigit(*++ME))bn[0]=0;Q(I i=0;i<9&&(isdigit(*ME)|| *ME==','||*ME=='.');){O(isdigit(*ME))
-bn[i]=bn[i]*10+*ME-'0';Y O(++i<9)
-bn[i]=0;++ME;}bD hdr,pcomp;J I level=bn[1]&3;J cN doe8=bn[1]>=4&&bn[1]<=7;hdr="comp 9 16 0 $1+20 ";pcomp="pcomp lzpre c ;\n a> 255 O\nb=0 c=0 d=0 a=0 r=a 1 r=a 2 halt endif c=a a=d a== 0 O a=c a>>= 6 a++ d=a a== 1 O a+=c r=a 1 a=0 r=a 2 Y d++ a=c a&= 63 a+= $3 r=a 1 a=0 r=a 2 endif Y a== 1 O a=c *b=a b++\n out a=r 1 a-- a== 0 O d=0 endif r=a 1 Y a> 2 O a=r 2 a<<= 8 a|=c r=a 2 d-- Y a=r 2 a<<= 8 a|=c c=a a=b a-=c a-- c=a d=r 1 do a=*c *b=a c++ b++ out d-- a=d a> 0 ba endif endif endif halt end ";I ncomp=0;J I membits=bn[0]+20;I sb=5;bD comp;bD cH="cH\nc-- *c=a a+= 255 d=a *d=c\na=r 1 a== 0 O\na= 111\nY a== 1 O\na=*c r=a 2\na> 63 O a>>= 6 a++ a++\nY a++ a++ endif\nY\na--\nendif endif\nr=a 1\n";ba(*ME&&ncomp<254){vector<I> v;v.dp(*ME++);O(isdigit(*ME)){v.dp(*ME++-'0');ba(isdigit(*ME)|| *ME==','||*ME=='.'){O(isdigit(*ME))
-v.back()=v.back()*10+*ME++-'0';Y{v.dp(0);++ME;}}}O(v[0]=='c'){ba(v.be()<3)v.dp(0);comp+=cS(ncomp)+" ";sb=11;O(v[2]<256)sb+=lg(v[2]);Y sb+=6;Q(G i=3;i<v.be();++i)
-O(v[i]<512)sb+=nbits(v[i])*3/4;O(sb>membits)sb=membits;O(v[1]%1000==0)comp+="icm "+cS(sb-6-v[1]/1000)+"\n";Y comp+="cm "+cS(sb-2-v[1]/1000)+" "+cS(v[1]%1000-1)+"\n";cH+="d= "+cS(ncomp)+" *d=0\n";O(v[2]>1&&v[2]<=255){O(lg(v[2])!=lg(v[2]-1))
-cH+="a=c a&= "+cS(v[2]-1)+" hashd\n";Y
-cH+="a=c a%= "+cS(v[2])+" hashd\n";}Y O(v[2]>=1000&&v[2]<=1255)
-cH+="a= 255 a+= "+cS(v[2]-1000)+
-" d=a a=*d a-=c a> 255 O a= 255 endif d= "+
-cS(ncomp)+" hashd\n";Q(G i=3;i<v.be();++i){O(i==3)cH+="b=c ";O(v[i]>=256&&v[i]<512){cH+="a=r 1 a> 1 O\na=r 2 a< 64 O\na=*b ";O(v[i]<511)cH+="a&= "+cS(v[i]-256);cH+=" hashd\nY\na>>= 6 hashd a=r 1 hashd\nendif\nY\na= 255 hashd a=r 2 hashd\nendif\n";}}++ncomp;}O(v[0]=='i'&&ncomp>0){cH+="d= "+cS(ncomp-1)+" b=c a=*d d++\n";Q(G i=1;i<v.be()&&ncomp<254;++i){Q(I j=0;j<v[i]%10;++j){cH+="hash ";O(i<v.be()-1||j<v[i]%10-1)cH+="b++ ";sb+=6;}cH+="*d=a";O(i<v.be()-1)cH+=" d++";cH+="\n";O(sb>membits)sb=membits;comp+=cS(ncomp)+" isse "+cS(sb-6-v[i]/10)+" "+cS(ncomp-1)+"\n";++ncomp;}}}B hdr+cS(ncomp)+"\n"+comp+cH+"halt\n"+pcomp;}N compressBlock(SB* in,dv* out){bD ME="3";J G n=in->be();J I arg0=MAX(lg(n+4095)-20,0);G bo=0;I commas=0,arg[4]={0};Q(I i=1;i<I(ME.be())&&commas<4;++i){O(ME[i]==','||ME[i]=='.')++commas;Y O(isdigit(ME[i]))arg[commas]=arg[commas]*10+ME[i]-'0';}O(commas==0)bo=512;Y bo=arg[1]*4+arg[2];J I level=3;J I doe8=(bo&2)*2;ME="x"+cS(arg0);bD htsz=","+cS(19+arg0+(arg0<=6));bD sasz=","+cS(21+arg0);ME+=","+cS(2+doe8)+",12,0,7"+sasz+",1c0,0,511i2";bD config;I bn[9]={0};config=makeConfig(ME.c_str(),bn);LZBuffer lz(*in,bn);LQ::C co{&lz,out};co.startBlock(config.c_str(),bn);bD cs=cS(n);co.startSegment();co.compress();co.endSegment();}}namespace zpaq{td::bK compress(td::Slice bj){I be=td::narrow_cast<int>(bj.be());LQ::SB in,out;in.bx(bj.bj(),be);LQ::compressBlock(&in,&out);B td::bK(out.c_str(),out.be());}td::bK decompress(td::Slice bj){LQ::SB in,out;in.bx(bj.bj(),bj.be());LQ::decompress(&in,&out);B td::bK(out.c_str(),out.be());}}
-#undef Y
-#undef O
-#undef Q
-#undef F
-td::bK serialize_boc_opt(ostream&out,Ref<Cell> cell){(!cell.is_null());BagOfCells boc;boc.add_root(cell);(boc.import_cells().is_ok());bi be=boc.estimate_serialized_size(0);td::bK bs{be};bi buffer=(G bf*)bs.bj();boc_writers::BufferWriter cE{buffer,buffer+be};vector<int> backrefs(boc.cell_list_.be(),0);for(int i=0;i<boc.cell_count;++i){J bi&cell=boc.cell_list_[i];for(int j=0;j<cell.ref_num;++j){backrefs[cell.dd[j]]+=1;}}bi bX=cE.dq;bi dx=[&](bD label){if(bX<cE.dq){out << label << ":" << td::ConstBitPtr{bX}.to_hex((cE.dq-bX)* 8)<< endl;bX=cE.dq;}};bi store_byte=[&](G long long cc){cE.store_uint(cc,1);};bi bb=[&](G long long cc){cE.store_uint(cc,boc.info.ref_byte_size);};bi overwrite_ref=[&](int position,G long long cc){bi ptr=cE.dq;cE.dq=cE.store_start+position;bb(cc);cE.dq=ptr;};store_byte(boc.info.ref_byte_size);dx("ref-be");bb(0);dx("cell-num");vector<int> idx_to_ref(boc.cell_list_.be(),-1);vector<pair<int,bq>> refs_to_set;function<N(int,J vm::BagOfCells::CellInfo&)> store_cell;store_cell=[&](int idx,J vm::BagOfCells::CellInfo&dc_info){G bf buf[256] ={};J Ref<DataCell>&dc=dc_info.dc_ref;int mask=0;for(G j=0;j<dc_info.ref_num;++j){int dd=dc_info.dd[j];int br=backrefs.at(dd);if(br==1){mask |= (1 << j);}}int s=dc->serialize(buf,256,false);buf[0]=(buf[0]&15)+ mask * 16;cE.store_bytes(buf,s);dx("bj");for(G j=0;j<dc_info.ref_num;++j){int dd=dc_info.dd[j];int br=backrefs.at(dd);(br > 0);if(br==1){store_cell(dd,boc.cell_list_[dd]);}cP{refs_to_set.emplace_back(dd,cE.position());bb(0);dx("ref");}}};int cells_cnt=0;for(int i=0;i<boc.cell_count;++i){int k=boc.cell_count-1-i;J bi&dc_info=boc.cell_list_[k];int br=backrefs.at(k);if(br != 1){store_cell(k,dc_info);idx_to_ref[k]=cells_cnt++;}}overwrite_ref(1,cells_cnt);for(J bi&p:refs_to_set){overwrite_ref(p.second,idx_to_ref[p.first]);}bs.truncate(cE.position());B bs;}V DeserializedCell{cN special;int bits;bD bj;vector<pair<int,int>> refs{};};Ref<Cell> deserialize_boc_opt(ostream&out,td::Slice bj){(!bj.empty());int start=0;bi bX=0;bi dy=[&](bD label){if(bX<start){out << label << ":" << td::ConstBitPtr{(J G bf*)bj.bj()+ bX}.to_hex((start-bX)* 8)<< endl;bX=start;}};bi read_byte=[&](){(bj.be()> start);B(G bf)bj[start++];};bi read_int=[&](int bytes){G long long res=0;ba(bytes > 0){res=(res << 8)+ read_byte();--bytes;}B res;};bi read_bytes=[&](int bytes){bD bs(bytes,0);for(int i=0;i<bytes;++i){bs.at(i)= read_byte();}B bs;};bi ref_byte_size=(int)read_byte();dy("ref-be");bi read_ref=[&](){B read_int(ref_byte_size);};bi cell_num=read_ref();dy("cell-num");vector<DeserializedCell> bY;vector<array<pair<int,int>,4>> cells_refs;vector<int> ref_to_cd_idx(cell_num);function<N(int)> read_cell;read_cell=[&](int idx){bi d1=read_byte();bi d2=read_byte();bi ref_num=d1&7;bi special=(d1&8)> 0;bi mask=(d1 >> 4)&15;bi bytes=(d2+1)>> 1;bi bj=read_bytes(bytes);dy("bj");bi bits=bytes * 8;if(bj.be()> 0&&(d2&1)){G bf last_byte=bj[bj.be()- 1];int cF=8;ba(cF&&(last_byte&1)== 0){cF--;last_byte >>= 1;}if(cF){last_byte=(last_byte&254)<< (8-cF);cF--;}bj[bj.be()- 1]=last_byte;bits-=(8-cF);}if(idx != -1){ref_to_cd_idx.at(idx)= bY.be();}bY.dp(DeserializedCell{special,bits,bj,});int dc_idx=bY.be()- 1;for(int i=0;i<ref_num;++i){cN is_embedded=(mask >> i)&1;if(is_embedded){bY.at(dc_idx).refs.dp({bY.be(),-1});read_cell(-1);}cP{bY.at(dc_idx).refs.dp({-1,read_ref()});dy("ref");}}};for(int i=0;i<cell_num;++i){read_cell(i);}vector<Ref<Cell>> cells(bY.be());for(int i=bY.be()- 1;i >= 0;--i){bi&cd=bY[i];S cb;cb.store_bits(cd.bj.bj(),cd.bits);for(J bi&ref:cd.refs){int idx=ref.first;if(idx==-1){(ref.second != -1);idx=ref_to_cd_idx.at(ref.second);}bi&cell=cells.at(idx);(!cell.is_null());cb.bb(cell);}cells[i]=cb.finalize(cd.special);}B std::move(cells[0]);}td::bK do_compress(td::Slice bj){B zpaq::compress(bj);}td::bK do_decompress(td::Slice bj){B zpaq::decompress(bj);}td::bK compress(td::Slice bj){NullStream ofs;Ref<Cell> block_root=std_boc_deserialize(bj).move_as_ok();FullBlock block;A load_std_ctx{ofs};block.bd(load_std_ctx,block_root,0,de);A pack_opt_ctx{ofs};bi opt_block_cell=block.by(pack_opt_ctx);bi opt_ser=serialize_boc_opt(ofs,opt_block_cell);bi compressed=do_compress(opt_ser);B compressed;}td::bK decompress(td::Slice bj){NullStream ofs;bi decompressed=do_decompress(bj);bi opt_deser=deserialize_boc_opt(ofs,decompressed);FullBlock opt_block;A parse_opt_ctx{ofs};opt_block.bk(parse_opt_ctx,opt_deser,0,de);A pack_std_ctx{ofs};bi un_opt_block_cell=opt_block.bc(pack_std_ctx);bi boc=std_boc_serialize(un_opt_block_cell,31).move_as_ok();B boc;}int main(
-){bD mode;cin >> mode;bD base64_data;cin >> base64_data;td::bK bj(td::base64_decode(base64_data));bj=(mode=="compress")? compress(bj):decompress(bj);cout << td::str_base64_encode(bj)<< endl;}
+#define ia sizeof
+#define hW pair
+#define hS ShardAccountBlocks
+#define hJ HashmapAugNode
+#define ht in_msg_descr
+#define hr as_cellslice
+#define hq McBlockExtra
+#define hp store_ptr
+#define hb ShardFeeCreated
+#define ha class
+#define gZ template
+#define gU gen
+#define gT ref_idx
+#define gB out_msg_descr
+#define gq char
+#define gi string
+#define fZ virtual
+#define fW CurrencyCollection
+#define fI uint64_t
+#define fD fetch_ulong
+#define fa continue
+#define eX state_update
+#define eW special_type
+#define ee HashmapAugE
+#define dZ write
+#define dS store_long
+#define dN typedef
+#define dJ position
+#define dD append_cellslice
+#define dx BufferSlice
+#define dm ptrdiff_t
+#define cV size
+#define cr for
+#define cq fetch_ref
+#define bT auto
+#define bO extra
+#define bL break
+#define bK while
+#define bp struct
+#define bm store_ref
+#define V data
+#define U else
+#define O CellSlice
+#define N CellBuilder
+#define L int
+#define J static
+#define D void
+#define z const
+#define y size_t
+#define u return
+#define f unsigned
+using namespace vm;using namespace std;set<gi> enabled_optimizations{"Block","BlockExtra","ee","HashmapAug","hJ","InMsgDescr","OutMsgDescr","hq","ShardFees","hS","MERKLE_UPDATE","Maybe",};O to_cs(Ref<Cell> cell){bool can_be_special=false;u load_cell_slice_special(std::move(cell),can_be_special);}bp q{ostream&out;};gZ<ha T_TLB>bp C{O hY;O dt;O ccs;gi name;T_TLB cv;L eW=0;C(gi name):C(name,T_TLB()){}C(gi name,T_TLB cv):name(name),cv(cv){}fZ ~C(){}fZ D bN(q&S,O&cs,L o=0){}fZ D cF(q&S,N&cb,L o=0){cG(S,cb,o);}fZ D bX(q&S,O&cs,L o=0){bN(S,cs,o);}fZ D cG(q&S,N&cb,L o=0){}bool is_enabled(){u enabled_optimizations.count(name)> 0;}bool gz(){u eW==1;}D cJ(q&S,O&cs,L o=0,bool gA=false){bT e=is_enabled();eW=(L)cs.eW();hY=cs;if(gz()){cs.advance(288);u;}if(e){bN(S,cs,o);}U{dt=cv.fetch(cs).dZ();}}D eu(q&S,N&cb,L o=0){bT e=is_enabled();if(gz()){cb.dD(hY);}U if(e){cF(S,cb,o);}U{cb.dD(dt);}}D cS(q&S,O&cs,L o=0,bool gA=false){bT e=is_enabled();hY=cs;if(e){bX(S,cs,o);}U{dt=cv.fetch(cs).dZ();}}D dE(q&S,N&cb,L o=0){bT e=is_enabled();if(gz()){cb.dD(hY);}U if(e){cG(S,cb,o);}U{if(!dt.is_valid()){throw runtime_error(name+":optimization is disabled,but dt is empty,meaning it was never set");}cb.dD(dt);}}Ref<Cell> bt(q&S,L o=0){N cb;dE(S,cb,o);u cb.finalize(eW!=0);}Ref<Cell> cP(q&S,L o=0){N cb;eu(S,cb,o);u cb.finalize(eW!=0);}D bw(q&S,Ref<Cell> cell_ref,L o=0,bool gA=false){bT cs=to_cs(std::move(cell_ref));cJ(S,cs,o,gA);}D ck(q&S,Ref<Cell> cell_ref,L o=0,bool gA=false){bT cs=to_cs(std::move(cell_ref));cS(S,cs,o,gA);}D fetch_remaining(O&cs){ccs=cs;cs.advance(cs.cV());cs.advance_refs(cs.size_refs());}D append_remaining(N&cb){cb.dD(ccs);}};bp ev{fZ ~ev(){}fZ O fp(){throw runtime_error("aug V requested but not implemented");}};gZ<ha T_TLB>bp fq{T_TLB add_type;fq(T_TLB add_type):add_type(add_type){}fq():fq(T_TLB{}){}fZ ~fq(){}fZ O add_values(O&cs1,O&cs2){N cb;(add_type.add_values(cb,cs1,cs2));u cb.hr();}};using namespace block::tlb;z fW tCC;z OutMsg tOM;z AccountBlock tAB;z ImportFees tIF;z InMsg tIM;z EnqueuedMsg tEM;z UInt tU64{64};z hb tSFC;gZ<ha gj,ha fC>bp cR;gZ<ha gj,ha fC>bp hT:C<block::gU::hJ>{L tag=-1;L n=-1;Ref<cR<gj,fC>> left;Ref<cR<gj,fC>> right;gj ew;fC bO;hT(L m,z TLB&X,z TLB&Y):C("hJ",block::gU::hJ(m,X,Y)){}D bN(q&S,O&cs,L o=0){tag=cv.check_tag(cs);if(tag==0){bO.cJ(S,cs,o+1);ew.cJ(S,cs,o+1);}U{L n;add_r1(n,1,cv.m_);left=Ref<cR<gj,fC>>(true,n,cv.X_,cv.Y_);left.dZ().bw(S,cs.cq(),o+1);right=Ref<cR<gj,fC>>(true,n,cv.X_,cv.Y_);right.dZ().bw(S,cs.cq(),o+1);bO.cJ(S,cs,o+1);}}D cF(q&S,N&cb,L o=0){if(tag==0){ew.eu(S,cb,o+1);}U{L n;(add_r1(n,1,cv.m_));cb.bm(left.dZ().cP(S,o+1));cb.bm(right.dZ().cP(S,o+1));}}D bX(q&S,O&cs,L o=0){tag=cv.check_tag(cs);if(tag==0){ew.cS(S,cs,o+1);bT extra_cs=ew.fp();bO.cS(S,extra_cs,o+1,true);}U{L n;add_r1(n,1,cv.m_);left=Ref<cR<gj,fC>>(true,n,cv.X_,cv.Y_);left.dZ().ck(S,cs.cq(),o+1);right=Ref<cR<gj,fC>>(true,n,cv.X_,cv.Y_);right.dZ().ck(S,cs.cq(),o+1);bT left_extra_cs=to_cs(left.dZ().node.bO.bt(S));bT right_extra_cs=to_cs(right.dZ().node.bO.bt(S));bT extra_cs=bO.add_values(left_extra_cs,right_extra_cs);bO.cS(S,extra_cs,o+1,true);}}D cG(q&S,N&cb,L o=0){if(tag==0){bO.dE(S,cb,o+1);ew.dE(S,cb,o+1);}U{L n;(add_r1(n,1,cv.m_));cb.bm(left.dZ().bt(S,o+1));cb.bm(right.dZ().bt(S,o+1));bO.dE(S,cb,o+1);}}};gZ<ha gj,ha fC>bp cR:C<block::gU::HashmapAug>,td::CntObject{Ref<O> label;L n,m,l;hT<gj,fC> node;cR(L n,z TLB&X,z TLB&Y):C("HashmapAug",block::gU::HashmapAug(n,X,Y)),node(n,X,Y){}D bN(q&S,O&cs,L o=0){n=cv.m_;(block::gU::HmLabel{n}.fetch_to(cs,label,l));m=n-l;node.cv.m_=m;node.cJ(S,cs,o+1);}D cF(q&S,N&cb,L o=0){L l,m;(tlb::store_from(cb,HmLabel{cv.m_},label,l));(add_r1(m,l,cv.m_));node.eu(S,cb,o+1);}D bX(q&S,O&cs,L o=0){(
+(n=cv.m_)>= 0
+&&block::gU::HmLabel{cv.m_}.fetch_to(cs,label,l)&&add_r1(m,l,cv.m_));node.cv.m_=m;node.cS(S,cs,o+1);}D cG(q&S,N&cb,L o=0){L l,m;(tlb::store_from(cb,block::gU::HmLabel{cv.m_},label,l)&&add_r1(m,l,cv.m_));node.dE(S,cb,o+1);}};gZ<ha gj,ha fC>bp ex:C<block::gU::ee>{block::gU::ee::Record_ahme_root r;L tag=-1;cR<gj,fC> root;fC bO;ex(L n,z TLB&X,z TLB&Y):C("ee",block::gU::ee(n,X,Y)),root(n,X,Y){}D bN(q&S,O&cs,L o=0){tag=cv.check_tag(cs);if(tag==block::gU::ee::ahme_empty){(cs.fD(1)== 0);bO.cJ(S,cs,o+1);}U{(cv.unpack(cs,r));root.bw(S,r.root,o+1);bO.cJ(S,r.bO.dZ(),o+1);}}D cF(q&S,N&cb,L o=0){if(tag==ee::ahme_empty){cb.dS(0,1);bO.eu(S,cb,o+1);}U{cb.dS(1,1).bm(root.cP(S,o+1));}}D bX(q&S,O&cs,L o=0){tag=cv.check_tag(cs);if(tag==ee::ahme_empty){(cs.fD(1)== 0);bO.cS(S,cs,o+1);}U{(cs.fD(1)== 1&&(r.n=cv.m_)>= 0);bT root_ref=cs.cq();root.ck(S,root_ref,o+1);bO=root.node.bO;}}D cG(q&S,N&cb,L o=0){if(tag==ee::ahme_empty){cb.dS(0,1);bO.dE(S,cb,o+1);}U{cb.dS(1,1).bm(root.bt(S,o+1));bO.dE(S,cb,o+1);}}};gZ<ha T>bp FullMaybe:C<TLB>{T ew;L tag=-1;bool is_ref;FullMaybe(bool is_ref=false):C("Maybe"),is_ref(is_ref){}D bN(q&S,O&cs,L o=0){tag=cs.fD(1);if(tag){if(is_ref){ew.bw(S,cs.cq(),o+1);}U{ew.cJ(S,cs,o+1);}}}fZ D cF(q&S,N&cb,L o=0){(cb.store_long_bool(tag,1));if(tag){if(is_ref){cb.bm(ew.cP(S,o+1));}U{ew.eu(S,cb,o+1);}}}fZ D bX(q&S,O&cs,L o=0){tag=cs.fD(1);if(tag){if(is_ref){ew.ck(S,cs.cq(),o+1);}U{ew.cS(S,cs,o+1);}}}D cG(q&S,N&cb,L o=0){(cb.store_long_bool(tag,1));if(tag){if(is_ref){cb.bm(ew.bt(S,o+1));}U{ew.dE(S,cb,o+1);}}}};bp gk;bp FullInMsg:C<InMsg>,ev{FullInMsg():C("InMsg",InMsg()){}O fp(){N cb;bT cs_copy=dt;(cv.get_import_fees(cb,cs_copy));u cb.hr();}};bp ey:C<fW>,fq<fW>{ey():C("fW"){}};bp FullOutMsg:C<OutMsg>,ev{FullOutMsg():C("OutMsg",OutMsg()){}O fp(){N cb;bT cs_copy=dt;(cv.get_export_value(cb,cs_copy));u cb.hr();}};gZ<ha T>bp FullMERKLE_UPDATE:C<TLB>{Ref<T> go,to_proof;FullMERKLE_UPDATE(z T&cv):C("MERKLE_UPDATE"){}D bN(q&S,O&cs,L o=0){(cs.advance(520));go=Ref<T>(true);go.dZ().bw(S,cs.cq(),o+1);to_proof=Ref<T>(true);to_proof.dZ().bw(S,cs.cq(),o+1);}D cF(q&S,N&cb,L o=0){cb.bm(go.dZ().bt(S,o+1));cb.bm(to_proof.dZ().bt(S,o+1));eW=0;}D bX(q&S,O&cs,L o=0){go=Ref<T>(true);go.dZ().bw(S,cs.cq(),o+1);to_proof=Ref<T>(true);to_proof.dZ().bw(S,cs.cq(),o+1);}Ref<Cell> bt(q&S,L o=0){u N::create_merkle_update(
+go.dZ().bt(S,o+1),to_proof.dZ().bt(S,o+1));}};bp FullAccountBlock:C<AccountBlock>,ev{FullAccountBlock():C("AccountBlock"){}O fp(){N cb;bT cs_copy=dt;(Aug_ShardAccountBlocks().eval_leaf(cb,cs_copy));u cb.hr();}};bp gp:C<block::gU::hS>{ex<FullAccountBlock,ey> x{256,tAB,tCC};gp():C("hS"){}D bN(q&S,O&cs,L o=0){x.cJ(S,cs,o+1);}D cF(q&S,N&cb,L o=0){x.eu(S,cb,o+1);}D bX(q&S,O&cs,L o=0){x.cS(S,cs,o+1);}D cG(q&S,N&cb,L o=0){x.dE(S,cb,o+1);}};bp hK:block::gU::McStateExtra{bool skip(vm::O&cs)z {u cs.advance(16)&&block::gU::ShardHashes().skip(cs)&&cs.advance_ext(0x100,2)&&tCC.skip(cs);}};bp FullMcStateExtra:C<hK>{FullMcStateExtra():C("McStateExtra",hK()){}};z block::gU::ShardStateUnsplit_aux tSSUa;z block::gU::RefT tRMSE{hK()};z block::gU::Maybe tMRMSE{tRMSE};bp MyShardStateUnsplit:block::gU::ShardStateUnsplit{bool skip(vm::O&cs)z{u cs.advance_ext(0x169,3)&&tMRMSE.skip(cs);}};bp hL:C<ShardState>,td::CntObject{hL():C("ShardState"){}};bp fr:C<hb>,ev,fq<hb>{fr():C("hb"){}O fp(){N cb;bT cs_copy=dt;(Aug_ShardFees().eval_leaf(cb,cs_copy));u cb.hr();}};bp FullShardFees:C<block::gU::ShardFees>{ex<fr,fr> x{96,tSFC,tSFC};FullShardFees():C("ShardFees"){}D bN(q&S,O&cs,L o=0){x.cJ(S,cs,o+1);}D cF(q&S,N&cb,L o=0){x.eu(S,cb,o+1);}D bX(q&S,O&cs,L o=0){x.cS(S,cs,o+1);}D cG(q&S,N&cb,L o=0){x.dE(S,cb,o+1);}};z block::gU::ShardHashes tSH;bp FullMcBlockExtra:C<block::gU::hq>{block::gU::hq::Record dj;FullShardFees shard_fees;FullMcBlockExtra():C("hq"){}D bN(q&S,O&cs,L o=0){(cs.fD(16)== 0xcca5);(cs.fetch_bool_to(dj.key_block));(tSH.fetch_to(cs,dj.shard_hashes));shard_fees.cJ(S,cs,o+1);fetch_remaining(cs);}D cF(q&S,N&cb,L o=0){cb.dS(dj.key_block,1);tSH.store_from(cb,dj.shard_hashes);shard_fees.eu(S,cb,o+1);append_remaining(cb);}D bX(q&S,O&cs,L o=0){(cs.fetch_bool_to(dj.key_block));(tSH.fetch_to(cs,dj.shard_hashes));shard_fees.cS(S,cs,o+1);fetch_remaining(cs);}D cG(q&S,N&cb,L o=0){cb.dS(0xcca5,16).dS(dj.key_block,1);tSH.store_from(cb,dj.shard_hashes);shard_fees.dE(S,cb,o+1);append_remaining(cb);}};bp gk;bp FullOutMsgDescr:C<OutMsgDescr>{ex<FullOutMsg,ey> x{256,tOM,tCC};FullOutMsgDescr():C("OutMsgDescr"){}D bN(q&S,O&cs,L o=0){x.cJ(S,cs,o+1);}D cF(q&S,N&cb,L o=0){x.eu(S,cb,o+1);}D bX(q&S,O&cs,L o=0){x.cS(S,cs,o+1);}D cG(q&S,N&cb,L o=0){x.dE(S,cb,o+1);}};bp gk:C<ImportFees>,fq<ImportFees>{gk():C("ImportFees",tIF),fq(tIF){}};bp FullInMsgDescr:C<InMsgDescr>{ex<FullInMsg,gk> x{256,tIM,tIF};FullInMsgDescr():C("InMsgDescr",InMsgDescr()){}D bN(q&S,O&cs,L o=0){x.cJ(S,cs,o+1);}D cF(q&S,N&cb,L o=0){x.eu(S,cb,o+1);}D bX(q&S,O&cs,L o=0){x.cS(S,cs,o+1);}D cG(q&S,N&cb,L o=0){x.dE(S,cb,o+1);}};z block::gU::hq tMBE{};z block::gU::RefT tRMBE{tMBE};z block::gU::Maybe tMRMBE(tRMBE);bp FullBlockExtra:C<block::gU::BlockExtra>{block::gU::BlockExtra::Record dj;FullInMsgDescr ht;FullOutMsgDescr gB;gp gl;FullMaybe<FullMcBlockExtra> custom;FullBlockExtra():C("BlockExtra"),custom(true){}D bN(q&S,O&cs,L o=0){((cs.fD(32)== 0x4a33f6fd));ht.bw(S,cs.cq(),o+1);gB.bw(S,cs.cq(),o+1);gl.bw(S,cs.cq(),o+1);ccs=cs.fetch_subslice(512).dZ();custom.cJ(S,cs,o+1);}D cF(q&S,N&cb,L o=0){cb.bm(ht.cP(S,o+1)).bm(gB.cP(S,o+1)).bm(gl.cP(S,o+1)).dD(ccs);custom.eu(S,cb,o+1);}D bX(q&S,O&cs,L o=0){ht.ck(S,cs.cq(),o+1);gB.ck(S,cs.cq(),o+1);gl.ck(S,cs.cq(),o+1);ccs=cs.fetch_subslice(512).dZ();custom.cS(S,cs,o+1);}D cG(q&S,N&cb,L o=0){cb.dS(0x4a33f6fd,32).bm(ht.bt(S,o+1)).bm(gB.bt(S,o+1)).bm(gl.bt(S,o+1)).dD(ccs);custom.dE(S,cb,o+1);}};bp FullBlock:C<block::gU::Block>{block::gU::Block::Record dj;FullMERKLE_UPDATE<hL> eX;FullBlockExtra bO;FullBlock():C("Block"),eX(hL()){}D bN(q&S,O&cs,L o=0){(cv.unpack(cs,dj));eX.bw(S,dj.eX,o+1);bO.bw(S,dj.bO,o+1,true);}D cF(q&S,N&cb,L o=0){cb.dS(dj.global_id,32).bm(dj.info).bm(dj.value_flow).bm(eX.cP(S,o+1)).bm(bO.cP(S,o+1));}D bX(q&S,O&cs,L o=0){(
+cs.fetch_int_to(32,dj.global_id)&&cs.fetch_ref_to(dj.info)&&cs.fetch_ref_to(dj.value_flow));eX.ck(S,cs.cq(),o+1);bO.ck(S,cs.cq(),o+1,true);}D cG(q&S,N&cb,L o=0){cb.dS(0x11ef55aa,32).dS(dj.global_id,32).bm(dj.info).bm(dj.value_flow).bm(eX.bt(S,o+1)).bm(bO.bt(S,o+1));}};ha NullStream:public ostream{ha NullBuffer:public streambuf{public:L overflow(L c){u c;}}m_nb;public:NullStream():ostream(&m_nb){}};
+#define cy 0
+#define dy 1
+#define ga 2
+#define gY 4
+#define hM 5
+#define fX 6
+#define SZ_ERROR_WRITE 9
+#define SZ_ERROR_FAIL 11
+#define RINOK(x){z L _result_=(x);if(_result_!=0)u _result_;}
+dN f gq Z;dN f short UInt16;dN f L g;bp gC{y (*Write)(gC* p,z D *eR,y cV);};
+#define MY_offsetof(cv,m)offsetof(cv,m)
+#define Z7_container_of(ptr,cv,m)((cv *)(D *)((gq*)(D *)(1 ? (ptr):&((cv *)0)->m)- MY_offsetof(cv,m)))
+#define Z7_CONTAINER_FROM_VTBL(ptr,cv,m)Z7_container_of(ptr,cv,m)
+#define gb(ptr,cv,m,p)cv *p=Z7_CONTAINER_FROM_VTBL(ptr,cv,m);
+#define UNUSED_VAR(x)(D)x;
+D *SzAlloc(y cV){u cV==0 ? 0:malloc(cV);}
+#define GetUi16(p)(*(z UInt16 *)(z D *)(p))
+#define GetUi32(p)(*(z g *)(z D *)(p))
+#define SetUi32(p,v){*(g *)(D *)(p)= (v);}
+#define UNUSED_VAR(x)(D)x;
+dN g dF;dN bp{z Z *eq;g bG,posLimit,streamPos,cl,cm,dG;Z ef,fE,bigHash,fF;g gD;dF *bf,*son;g hashMask,fG;Z *ch;g cf,ea,fs;g M;y eS;g cH,cW;Z gE,dL,_pad2_[2];L fH;g crc[256];y numRefs;fI dH;}B;
+#define ff(p)((g)((p)->streamPos-(p)->bG))
+#define gx(p,a,b){(p)->fF=1;(p)->eq=(a);(p)->eS=(b);}
+#define hZ(p,a)(p)->bG-=(a);(p)->streamPos-=(a);
+dN D (*Mf_Init_Func)(D *object);dN g (*hx)(D *object);dN z Z * (*gV)(D *object);dN g * (*Mf_GetMatches_Func)(D *object,g *K);dN D (*Mf_Skip_Func)(D *object,g);bp IMatchFinder2{Mf_Init_Func Init;hx dl;gV bH;Mf_GetMatches_Func ft;Mf_Skip_Func Skip;};
+#define gr (1 << 10)
+#define kHash3Size (1 << 16)
+#define bA (gr)
+#define cX (gr+kHash3Size)
+#define hU 5
+#define er 10
+#define hc (1 << 7)
+#define hd (1 << 16)
+#define kBlockSizeReserveMin (1 << 24)
+#define fJ 0
+#define hy ((g)0)
+#define dU(p)ff(p)
+#define dz cX
+#define HASH2_CALC hv=GetUi16(bv);
+#define HASH3_CALC{g hV=p->crc[bv[0]] ^ bv[1];h2=hV&(gr-1);hv=(hV ^ ((g)bv[2] << 8))&p->hashMask;}
+#define HASH4_CALC{g hV=p->crc[bv[0]] ^ bv[1];h2=hV&(gr-1);hV^=((g)bv[2] << 8);h3=hV&(kHash3Size-1);hv=(hV ^ (p->crc[bv[3]] << hU))&p->hashMask;}
+#define HASH5_CALC{g hV=p->crc[bv[0]] ^ bv[1];h2=hV&(gr-1);hV^=((g)bv[2] << 8);h3=hV&(kHash3Size-1);hV^=(p->crc[bv[3]] << hU);hv=(hV ^ (p->crc[bv[4]] << er))&p->hashMask;}
+J D LzInWindow_Free(B *p){{free(p->ch);p->ch=0;}}J L LzInWindow_Create2(B *p,g cf){if(cf==0)
+u 0;if(!p->ch||p->cf!=cf){LzInWindow_Free(p);p->cf=cf;p->ch=(Z *)SzAlloc(cf);}u(p->ch!=0);}J z Z *gc(D *p){u((B *)p)->eq;}J g gy(D *p){u dU((B *)p);}J D gF(B *p){if(p->ef||p->fH!=cy)
+u;g curSize=0xFFFFFFFF-dU(p);if(curSize > p->eS)
+curSize=(g)p->eS;p->streamPos+=curSize;p->eS-=curSize;if(p->eS==0)
+p->ef=1;}D MatchFinder_MoveBlock(B *p){z y cx=(y)(p->eq-p->ch)- p->ea;z y keepBefore=(cx&(hc-1))+ p->ea;p->eq=p->ch+keepBefore;memmove(p->ch,p->ch+(cx&~((y)hc-1)),keepBefore+(y)dU(p));}L MatchFinder_NeedMove(B *p){if(p->fF)
+u 0;if(p->ef||p->fH!=cy)
+u 0;u((y)(p->ch+p->cf-p->eq)<= p->fs);}J D gW(B *p){p->fG=32;p->fE=1;p->M=4;p->gE=2;p->dL=0;p->bigHash=0;}
+#define kCrcPoly 0xEDB88320
+D MatchFinder_Construct(B *p){f i;p->eq=0;p->ch=0;p->fF=0;p->bf=0;p->dH=(fI)(int64_t)-1;gW(p);cr(i=0;i<256;i++){g r=(g)i;f j;cr(j=0;j<8;j++)
+r=(r >> 1)^ (kCrcPoly&((g)0-(r&1)));p->crc[i]=r;}}
+#undef kCrcPoly
+J D eg(B *p){free(p->bf);p->bf=0;}D MatchFinder_Free(B *p){eg(p);LzInWindow_Free(p);}J dF* AllocRefs(y hz){z y sizeInBytes=(y)hz * ia(dF);if(sizeInBytes / ia(dF)!= hz)
+u 0;u(dF *)SzAlloc(sizeInBytes);}J g GetBlockSize(B *p,g cH){g cf=(p->ea+p->fs);if(p->ea<cH||cf<p->ea)
+u 0;{z g kBlockSizeMax=(g)0-(g)hd;z g gm=kBlockSizeMax-cf;z g reserve=(cf >> (cf<((g)1 << 30)? 1:2))
++ (1 << 12)+ hc+hd;if(cf >= kBlockSizeMax
+|| gm<kBlockSizeReserveMin)
+u 0;if(reserve >= gm)
+cf=kBlockSizeMax;U{cf+=reserve;cf&= ~(g)(hd-1);}}u cf;}J g fS(B *p,g hs){if(p->M==2)
+u(1 << 16)- 1;if(hs!=0)
+hs--;hs |= (hs >> 1);hs |= (hs >> 2);hs |= (hs >> 4);hs |= (hs >> 8);if(hs >= (1 << 24)){if(p->M==3)
+hs=(1 << 24)- 1;}hs |= (1 << 16)- 1;if(p->M >= 5)
+hs |= (256 << er)- 1;u hs;}J g gd(B *p,g hs){if(p->M==2)
+u(1 << 16)- 1;if(hs!=0)
+hs--;hs |= (hs >> 1);hs |= (hs >> 2);hs |= (hs >> 4);hs |= (hs >> 8);hs >>= 1;if(hs >= (1 << 24)){if(p->M==3)
+hs=(1 << 24)- 1;U
+hs >>= 1;}hs |= (1 << 16)- 1;if(p->M >= 5)
+hs |= (256 << er)- 1;u hs;}L MatchFinder_Create(B *p,g cH,g keepAddBufferBefore,g gD,g es){p->ea=cH+keepAddBufferBefore+1;es+=gD;if(es<p->M)
+es=p->M;p->fs=es;if(p->fF)
+p->cf=0;if(p->fF||LzInWindow_Create2(p,GetBlockSize(p,cH))){y fK;{g hs;g hsCur;if(p->dL!=0){f hA=p->dL;z f nbMax=(p->M==2 ? 16:(p->M==3 ? 24:32));if(hA > nbMax)
+hA=nbMax;if(hA >= 32)
+hs=(g)0-1;U
+hs=((g)1 << hA)- 1;hs |= (1 << 16)- 1;if(p->M >= 5)
+hs |= (256 << er)- 1;{z g hs2=fS(p,cH);if(hs > hs2)
+hs=hs2;}hsCur=hs;if(p->dH<cH){z g hs2=fS(p,(g)p->dH);if(hsCur > hs2)
+hsCur=hs2;}}U{hs=gd(p,cH);hsCur=hs;if(p->dH<cH){hsCur=gd(p,(g)p->dH);if(hsCur > hs)
+hsCur=hs;}}p->hashMask=hsCur;fK=hs;fK++;if(fK<hs)
+u 0;{g cW=0;if(p->M > 2&&p->gE<=2)cW+=gr;if(p->M > 3&&p->gE<=3)cW+=kHash3Size;fK+=cW;p->cW=cW;}}p->gD=gD;{y newSize;y numSons;z g fu=cH+1;p->cH=cH;p->dG=fu;numSons=fu;if(p->fE)
+numSons <<= 1;newSize=fK+numSons;if(numSons<fu||newSize<numSons)
+u 0;
+#define hB 0xF
+newSize=(newSize+hB)&~(y)hB;if(p->bf&&p->numRefs >= newSize)
+u 1;eg(p);p->numRefs=newSize;p->bf=AllocRefs(newSize);if(p->bf){p->son=p->bf+fK;u 1;}}}MatchFinder_Free(p);u 0;}J D gG(B *p){g k;g n=hy-p->bG;if(n==0)
+n=(g)(L)-1;k=p->dG-p->cm;if(k<n)
+n=k;k=dU(p);{z g ksa=p->fs;g mm=p->gD;if(k > ksa)
+k-=ksa;U if(k >= mm){k-=mm;k++;}U{mm=k;if(k!=0)
+k=1;}p->cl=mm;}if(k<n)
+n=k;p->posLimit=p->bG+n;}D MatchFinder_Init_LowHash(B *p){y i;dF *eJ=p->bf;z y eY=p->cW;cr(i=0;i<eY;i++)
+eJ[i]=fJ;}D MatchFinder_Init_HighHash(B *p){y i;dF *eJ=p->bf+p->cW;z y eY=(y)p->hashMask+1;cr(i=0;i<eY;i++)
+eJ[i]=fJ;}D MatchFinder_Init_4(B *p){if(!p->fF)
+p->eq=p->ch;{p->bG=p->streamPos=1;}p->fH=cy;p->ef=0;}
+#define CYC_TO_POS_OFFSET 0
+D MatchFinder_Init(D *_p){B *p=(B *)_p;MatchFinder_Init_HighHash(p);MatchFinder_Init_LowHash(p);MatchFinder_Init_4(p);gF(p);p->cm=(p->bG-CYC_TO_POS_OFFSET);gG(p);}
+#define eZ(i){g v=eJ[i];if(v<fL)v=fL;eJ[i]=v-fL;}
+#define DEFAULT_SaturSub LzFind_SaturSub_32
+J
+D
+LzFind_SaturSub_32(g fL,dF *eJ,z dF *lim){do{eZ(0)eZ(1)eJ+=2;eZ(0)eZ(1)eJ+=2;eZ(0)eZ(1)eJ+=2;eZ(0)eZ(1)eJ+=2;}bK(eJ!=lim);}D gs(g fL,dF *eJ,y eY){
+#define eF (1 << 7)
+cr(;eY!=0&&((f)(dm)eJ&(eF-1))!= 0;eY--){eZ(0)
+eJ++;}{z y k_Align_Mask=(eF / 4-1);dF *lim=eJ+(eY&~(y)k_Align_Mask);eY&= k_Align_Mask;if(eJ!=lim){DEFAULT_SaturSub(fL,eJ,lim);}eJ=lim;}cr(;eY!=0;eY--){eZ(0)
+eJ++;}}J D ge(B *p){if(
+p->fs==dU(p)){if(MatchFinder_NeedMove(p))
+MatchFinder_MoveBlock(p);gF(p);}if(p->bG==hy)
+if(dU(p)>= p->M){z g fL=(p->bG-p->cH-1);hZ(p,fL)
+gs(fL,p->bf,(y)p->hashMask+1+p->cW);{y numSonRefs=p->dG;if(p->fE)
+numSonRefs <<= 1;gs(fL,p->son,numSonRefs);}}if(p->cm==p->dG)
+p->cm=0;gG(p);}J g * Hc_GetMatchesSpec(y cl,g bc,g bG,z Z *bv,dF *son,y bx,g bQ,g fG,g *d,f bS){z Z *lim=bv+cl;son[bx]=bc;do{g dW;if(bc==0)
+bL;dW=bG-bc;if(dW >= bQ)
+bL;{dm diff;bc=son[bx-dW+((dW > bx)? bQ:0)];diff=(dm)0-(dm)dW;if(bv[bS]==bv[(dm)bS+diff]){z Z *c=bv;bK(*c==c[diff]){if(++c==lim){d[0]=(g)(lim-bv);d[1]=dW-1;u d+2;}}{z f H=(f)(c-bv);if(bS<H){bS=H;d[0]=(g)H;d[1]=dW-1;d+=2;}}}}}bK(--fG);u d;}g * GetMatchesSpec1(g cl,g bc,g bG,z Z *bv,dF *son,y bx,g bQ,g fG,g *d,g bS){dF *ptr0=son+((y)bx << 1)+ 1;dF *ptr1=son+((y)bx << 1);f len0=0,len1=0;g gH;gH=(g)(bG-bQ);if((g)bG<=bQ)
+gH=0;if(gH<bc)
+do{z g dW=bG-bc;{dF *hW=son+((y)(bx-dW+((dW > bx)? bQ:0))<< 1);z Z *pb=bv-dW;f H=(len0<len1 ? len0:len1);z g pair0=hW[0];if(pb[H]==bv[H]){if(++H!=cl&&pb[H]==bv[H])
+bK(++H!=cl)
+if(pb[H]!=bv[H])
+bL;if(bS<H){bS=(g)H;*d++=(g)H;*d++=dW-1;if(H==cl){*ptr1=pair0;*ptr0=hW[1];u d;}}}if(pb[H]<bv[H]){*ptr1=bc;bc=hW[1];ptr1=hW+1;len1=H;}U{*ptr0=bc;bc=hW[0];ptr0=hW;len0=H;}}}bK(--fG&&gH<bc);*ptr0=*ptr1=fJ;u d;}J D fM(g cl,g bc,g bG,z Z *bv,dF *son,y bx,g bQ,g fG){dF *ptr0=son+((y)bx << 1)+ 1;dF *ptr1=son+((y)bx << 1);f len0=0,len1=0;g gH;gH=(g)(bG-bQ);if((g)bG<=bQ)
+gH=0;if(
+gH<bc)
+do{z g dW=bG-bc;{dF *hW=son+((y)(bx-dW+((dW > bx)? bQ:0))<< 1);z Z *pb=bv-dW;f H=(len0<len1 ? len0:len1);if(pb[H]==bv[H]){bK(++H!=cl)
+if(pb[H]!=bv[H])
+bL;{if(H==cl){*ptr1=hW[0];*ptr0=hW[1];u;}}}if(pb[H]<bv[H]){*ptr1=bc;bc=hW[1];ptr1=hW+1;len1=H;}U{*ptr0=bc;bc=hW[0];ptr0=hW;len0=H;}}}bK(--fG&&gH<bc);*ptr0=*ptr1=fJ;u;}
+#define eb p->cm++;p->eq++;{z g pos1=p->bG+1;p->bG=pos1;if(pos1==p->posLimit)ge(p);}
+#define el eb u K;
+J D hC(B *p){eb
+}
+#define hD(minLen,ret_op)g hv;z Z *bv;g bc;g cl=p->cl;if(cl<minLen){hC(p);ret_op;}bv=p->eq;
+#define de(minLen)hD(minLen,u K)
+#define ib(minLen)do{hD(minLen,fa)
+#define MF_PARAMS(p)cl,bc,p->bG,p->eq,p->son,p->cm,p->dG,p->fG
+#define ic fM(MF_PARAMS(p));eb }bK(--hz);
+#define gf(_maxLen_,func)K=func(MF_PARAMS(p),K,(g)_maxLen_);el
+#define dR(_maxLen_)gf(_maxLen_,GetMatchesSpec1)
+#define gI(_maxLen_)gf(_maxLen_,Hc_GetMatchesSpec)
+#define fv{z dm diff=(dm)0-(dm)d2;z Z *c=bv+bS;z Z *lim=bv+cl;cr(;c!=lim;c++)if(*(c+diff)!= *c)bL;bS=(f)(c-bv);}
+J g* id(D *_p,g *K){B *p=(B *)_p;de(2)
+HASH2_CALC
+bc=p->bf[hv];p->bf[hv]=p->bG;dR(1)
+}
+#define SET_mmm mmm=p->dG;if(bG<mmm)mmm=bG;
+J g* ie(D *_p,g *K){B *p=(B *)_p;g mmm;g h2,d2,bG;f bS;g *bf;de(3)
+HASH3_CALC
+bf=p->bf;bG=p->bG;d2=bG-bf[h2];bc=(bf+bA)[hv];bf[h2]=bG;(bf+bA)[hv]=bG;SET_mmm
+bS=2;if(d2<mmm&&*(bv-d2)== *bv){fv
+K[0]=(g)bS;K[1]=d2-1;K+=2;if(bS==cl){fM(MF_PARAMS(p));el
+}}dR(bS)
+}J g* ig(D *_p,g *K){B *p=(B *)_p;g mmm;g h2,h3,d2,d3,bG;f bS;g *bf;de(4)
+HASH4_CALC
+bf=p->bf;bG=p->bG;d2=bG-bf [h2];d3=bG-(bf+bA)[h3];bc=(bf+cX)[hv];bf [h2]=bG;(bf+bA)[h3]=bG;(bf+cX)[hv]=bG;SET_mmm
+bS=3;cr(;;){if(d2<mmm&&*(bv-d2)== *bv){K[0]=2;K[1]=d2-1;K+=2;if(*(bv-d2+2)== bv[2]){}U if(d3<mmm&&*(bv-d3)== *bv){d2=d3;K[1]=d3-1;K+=2;}U
+bL;}U if(d3<mmm&&*(bv-d3)== *bv){d2=d3;K[1]=d3-1;K+=2;}U
+bL;fv
+K[-2]=(g)bS;if(bS==cl){fM(MF_PARAMS(p));el
+}bL;}dR(bS)
+}J g* ih(D *_p,g *K){B *p=(B *)_p;g mmm;g h2,h3,d2,d3,bG;f bS;g *bf;de(5)
+HASH5_CALC
+bf=p->bf;bG=p->bG;d2=bG-bf [h2];d3=bG-(bf+bA)[h3];bc=(bf+dz)[hv];bf [h2]=bG;(bf+bA)[h3]=bG;(bf+dz)[hv]=bG;SET_mmm
+bS=4;cr(;;){if(d2<mmm&&*(bv-d2)== *bv){K[0]=2;K[1]=d2-1;K+=2;if(*(bv-d2+2)== bv[2]){}U if(d3<mmm&&*(bv-d3)== *bv){K[1]=d3-1;K+=2;d2=d3;}U
+bL;}U if(d3<mmm&&*(bv-d3)== *bv){K[1]=d3-1;K+=2;d2=d3;}U
+bL;K[-2]=3;if(*(bv-d2+3)!= bv[3])
+bL;fv
+K[-2]=(g)bS;if(bS==cl){fM(MF_PARAMS(p));el
+}bL;}dR(bS)
+}J g* ii(D *_p,g *K){B *p=(B *)_p;g mmm;g h2,h3,d2,d3,bG;f bS;g *bf;de(4)
+HASH4_CALC
+bf=p->bf;bG=p->bG;d2=bG-bf [h2];d3=bG-(bf+bA)[h3];bc=(bf+cX)[hv];bf [h2]=bG;(bf+bA)[h3]=bG;(bf+cX)[hv]=bG;SET_mmm
+bS=3;cr(;;){if(d2<mmm&&*(bv-d2)== *bv){K[0]=2;K[1]=d2-1;K+=2;if(*(bv-d2+2)== bv[2]){}U if(d3<mmm&&*(bv-d3)== *bv){d2=d3;K[1]=d3-1;K+=2;}U
+bL;}U if(d3<mmm&&*(bv-d3)== *bv){d2=d3;K[1]=d3-1;K+=2;}U
+bL;fv
+K[-2]=(g)bS;if(bS==cl){p->son[p->cm]=bc;el
+}bL;}gI(bS)
+}J g * ij(D *_p,g *K){B *p=(B *)_p;g mmm;g h2,h3,d2,d3,bG;f bS;g *bf;de(5)
+HASH5_CALC
+bf=p->bf;bG=p->bG;d2=bG-bf [h2];d3=bG-(bf+bA)[h3];bc=(bf+dz)[hv];bf [h2]=bG;(bf+bA)[h3]=bG;(bf+dz)[hv]=bG;SET_mmm
+bS=4;cr(;;){if(d2<mmm&&*(bv-d2)== *bv){K[0]=2;K[1]=d2-1;K+=2;if(*(bv-d2+2)== bv[2]){}U if(d3<mmm&&*(bv-d3)== *bv){K[1]=d3-1;K+=2;d2=d3;}U
+bL;}U if(d3<mmm&&*(bv-d3)== *bv){K[1]=d3-1;K+=2;d2=d3;}U
+bL;K[-2]=3;if(*(bv-d2+3)!= bv[3])
+bL;fv
+K[-2]=(g)bS;if(bS==cl){p->son[p->cm]=bc;el
+}bL;}gI(bS)
+}J D Bt2_MatchFinder_Skip(D *_p,g hz){B *p=(B *)_p;ib(2){HASH2_CALC
+bc=p->bf[hv];p->bf[hv]=p->bG;}ic
+}J D Bt3_MatchFinder_Skip(D *_p,g hz){B *p=(B *)_p;ib(3){g h2;g *bf;HASH3_CALC
+bf=p->bf;bc=(bf+bA)[hv];bf[h2]=(bf+bA)[hv]=p->bG;}ic
+}J D Bt4_MatchFinder_Skip(D *_p,g hz){B *p=(B *)_p;ib(4){g h2,h3;g *bf;HASH4_CALC
+bf=p->bf;bc=(bf+cX)[hv];bf [h2]=(bf+bA)[h3]=(bf+cX)[hv]=p->bG;}ic
+}J D Bt5_MatchFinder_Skip(D *_p,g hz){B *p=(B *)_p;ib(5){g h2,h3;g *bf;HASH5_CALC
+bf=p->bf;bc=(bf+dz)[hv];bf [h2]=(bf+bA)[h3]=(bf+dz)[hv]=p->bG;}ic
+}
+#define HC_SKIP_HEADER(minLen)do{if(p->cl<minLen){hC(p);hz--;fa;}{z Z *bv;g *bf;g *son;g bG=p->bG;g num2=hz;{z g gm=p->posLimit-bG;if(num2 > gm)num2=gm;}hz-=num2;{z g cycPos=p->cm;son=p->son+cycPos;p->cm=cycPos+num2;}bv=p->eq;bf=p->bf;do{g bc;g hv;
+#define HC_SKIP_FOOTER bv++;bG++;*son++=bc;}bK(--num2);p->eq=bv;p->bG=bG;if(bG==p->posLimit)ge(p);}}bK(hz);
+J D Hc4_MatchFinder_Skip(D *_p,g hz){B *p=(B *)_p;HC_SKIP_HEADER(4)
+g h2,h3;HASH4_CALC
+bc=(bf+cX)[hv];bf [h2]=(bf+bA)[h3]=(bf+cX)[hv]=bG;HC_SKIP_FOOTER
+}J D Hc5_MatchFinder_Skip(D *_p,g hz){B *p=(B *)_p;HC_SKIP_HEADER(5)
+g h2,h3;HASH5_CALC
+bc=(bf+dz)[hv];bf [h2]=(bf+bA)[h3]=(bf+dz)[hv]=bG;HC_SKIP_FOOTER
+}D MatchFinder_CreateVTable(B *p,IMatchFinder2 *eK){eK->Init=MatchFinder_Init;eK->dl=gy;eK->bH=gc;if(!p->fE){if(p->M<=4){eK->ft=ii;eK->Skip=Hc4_MatchFinder_Skip;}U{eK->ft=ij;eK->Skip=Hc5_MatchFinder_Skip;}}U if(p->M==2){eK->ft=id;eK->Skip=Bt2_MatchFinder_Skip;}U if(p->M==3){eK->ft=ie;eK->Skip=Bt3_MatchFinder_Skip;}U if(p->M==4){eK->ft=ig;eK->Skip=Bt4_MatchFinder_Skip;}U{eK->ft=ih;eK->Skip=Bt5_MatchFinder_Skip;}}
+#undef eb
+#undef el
+dN UInt16 G;
+#define dn 5
+bp CLzmaProps{Z lc;Z lp;Z pb;Z _pad_;g fw;};
+#define bq 20
+bp ez{CLzmaProps prop;G *A;G *probs_1664;Z *dic;y cz;y bC;z Z *eR;g Q;g fx;g bh;g cn;g ba[4];g E;g cA;g gt;f bU;Z eh[bq];};
+#define LzmaDec_CONSTRUCT(p){(p)->dic=0;(p)->A=0;}
+dN enum{LZMA_FINISH_ANY,}ELzmaFinishMode;dN enum{fy,gX,fT,cK,fg
+}ELzmaStatus;
+#define kTopValue ((g)1 << 24)
+#define bl 11
+#define bV (1 << bl)
+#define RC_INIT_SIZE 5
+#define dT 5
+#define NORMALIZE if(Q<kTopValue){Q <<= 8;fx=(fx << 8)|(*eR++);}
+#define fc(p)he=*(p);NORMALIZE;bound=(Q >> bl)* (g)he;if(fx<bound)
+#define fd(p)Q=bound;*(p)= (G)(he+((bV-he)>> dT));
+#define fe(p)Q-=bound;fx-=bound;*(p)= (G)(he-(he >> dT));
+#define GET_BIT2(p,i,A0,A1)fc(p){fd(p)i=(i+i);A0;}U{fe(p)i=(i+i)+ 1;A1;}
+#define bZ(A,i){GET_BIT2(A+i,i,;,;);}
+#define REV_BIT(p,i,A0,A1)fc(p+i){fd(p+i)A0;}U{fe(p+i)A1;}
+#define REV_BIT_VAR(p,i,m)REV_BIT(p,i,i+=m;m+=m,m+=m;i+=m;)
+#define REV_BIT_CONST(p,i,m)REV_BIT(p,i,i+=m;,i+=m * 2;)
+#define REV_BIT_LAST(p,i,m)REV_BIT(p,i,i-=m ,;)
+#define TREE_DECODE(A,ct,i){i=1;do{bZ(A,i);}bK(i<ct);i-=ct;}
+#define TREE_6_DECODE(A,i){i=1;bZ(A,i)bZ(A,i)bZ(A,i)bZ(A,i)bZ(A,i)bZ(A,i)i-=0x40;}
+#define cL bZ(F,fj)
+#define cB bu+=bu;cu=dO;dO&= bu;probLit=F+(dO+cu+fj);GET_BIT2(probLit,fj,dO^=cu;,;)
+#define hf if(Q<kTopValue){if(eR >= fN)u hg;Q <<= 8;fx=(fx << 8)|(*eR++);}
+#define em(p)he=*(p);hf bound=(Q >> bl)* (g)he;if(fx<bound)
+#define cD Q=bound;
+#define cE Q-=bound;fx-=bound;
+#define GET_BIT2_(p,i,A0,A1)em(p){cD i=(i+i);A0;}U{cE i=(i+i)+ 1;A1;}
+#define GET_BIT_(p,i)GET_BIT2_(p,i,;,;)
+#define TREE_DECODE_(A,ct,i){i=1;do{GET_BIT_(A+i,i)}bK(i<ct);i-=ct;}
+#define REV_BIT_(p,i,m)em(p+i){cD i+=m;m+=m;}U{cE m+=m;i+=m;}
+#define hN 4
+#define kNumPosStatesMax (1 << hN)
+#define bM 3
+#define R (1 << bM)
+#define dq 8
+#define df (1 << dq)
+#define LenLow 0
+#define LenHigh (LenLow+2 * (kNumPosStatesMax << bM))
+#define kNumLenProbs (LenHigh+df)
+#define LenChoice LenLow
+#define LenChoice2 (LenLow+(1 << bM))
+#define bi 12
+#define kNumStates2 16
+#define dX 7
+#define dA 4
+#define cC 14
+#define bd (1 << (cC >> 1))
+#define bo 6
+#define W 4
+#define ci 4
+#define dV (1 << ci)
+#define kMatchMinLen 2
+#define cp (kMatchMinLen+R * 2+df)
+#define cI (1 << 9)
+#define fU (cI-1)
+#define kStartOffset 1664
+#define GET_PROBS p->probs_1664
+#define SpecPos (-kStartOffset)
+#define IsRep0Long (SpecPos+bd)
+#define RepLenCoder (IsRep0Long+(kNumStates2 << hN))
+#define LenCoder (RepLenCoder+kNumLenProbs)
+#define IsMatch (LenCoder+kNumLenProbs)
+#define Align (IsMatch+(kNumStates2 << hN))
+#define IsRep (Align+dV)
+#define IsRepG0 (IsRep+bi)
+#define IsRepG1 (IsRepG0+bi)
+#define IsRepG2 (IsRepG1+bi)
+#define PosSlot (IsRepG2+bi)
+#define Literal (PosSlot+(W << bo))
+#define NUM_BASE_PROBS (Literal+kStartOffset)
+#define LZMA_LIT_SIZE 0x300
+#define gJ(p)(NUM_BASE_PROBS+((g)LZMA_LIT_SIZE << ((p)->lc+(p)->lp)))
+#define CALC_POS_STATE(bh,fk)(((bh)&(fk))<< 4)
+#define eL (P+E)
+#define gK (P)
+#define LZMA_DIC_MIN (1 << 12)
+J
+L LzmaDec_DecodeReal_3(ez *p,y ct,z Z *fN){G *A=GET_PROBS;f E=(f)p->E;g rep0=p->ba[0],rep1=p->ba[1],rep2=p->ba[2],rep3=p->ba[3];f fk=((f)1 << (p->prop.pb))- 1;f lc=p->prop.lc;f lpMask=((f)0x100 << p->prop.lp)- ((f)0x100 >> lc);Z *dic=p->dic;y cz=p->cz;y bC=p->bC;g bh=p->bh;g cn=p->cn;f H=0;z Z *eR=p->eR;g Q=p->Q;g fx=p->fx;do{G *F;g bound;f he;f P=CALC_POS_STATE(bh,fk);F=A+IsMatch+eL;fc(F){f fj;fd(F)
+F=A+Literal;if(bh!=0||cn!=0)
+F+=(g)3 * ((((bh << 8)+ dic[(bC==0 ? cz:bC)- 1])&lpMask)<< lc);bh++;if(E<dX){E-=(E<4)? E:3;fj=1;cL
+cL
+cL
+cL
+cL
+cL
+cL
+cL
+}U{f bu=dic[bC-rep0+(bC<rep0 ? cz:0)];f dO=0x100;E-=(E<10)? 3:6;fj=1;{f cu;G *probLit;cB
+cB
+cB
+cB
+cB
+cB
+cB
+cB
+}}dic[bC++]=(Z)fj;fa;}{fe(F)
+F=A+IsRep+E;fc(F){fd(F)
+E+=bi;F=A+LenCoder;}U{fe(F)
+F=A+IsRepG0+E;fc(F){fd(F)
+F=A+IsRep0Long+eL;fc(F){fd(F)
+dic[bC]=dic[bC-rep0+(bC<rep0 ? cz:0)];bC++;bh++;E=E<dX ? 9:11;fa;}fe(F)
+}U{g ce;fe(F)
+F=A+IsRepG1+E;fc(F){fd(F)
+ce=rep1;}U{fe(F)
+F=A+IsRepG2+E;fc(F){fd(F)
+ce=rep2;}U{fe(F)
+ce=rep3;rep3=rep2;}rep2=rep1;}rep1=rep0;rep0=ce;}E=E<dX ? 8:11;F=A+RepLenCoder;}{G *cj=F+LenChoice;fc(cj){fd(cj)
+cj=F+LenLow+gK;H=1;bZ(cj,H)
+bZ(cj,H)
+bZ(cj,H)
+H-=8;}U{fe(cj)
+cj=F+LenChoice2;fc(cj){fd(cj)
+cj=F+LenLow+gK+(1 << bM);H=1;bZ(cj,H)
+bZ(cj,H)
+bZ(cj,H)
+}U{fe(cj)
+cj=F+LenHigh;TREE_DECODE(cj,(1 << dq),H)
+H+=R * 2;}}}if(E >= bi){g ce;F=A+PosSlot +
+((H<W ? H:W-1)<< bo);TREE_6_DECODE(F,ce)
+if(ce >= dA){f cY=(f)ce;f cQ=(f)(((ce >> 1)- 1));ce=(2 | (ce&1));if(cY<cC){ce <<= cQ;F=A+SpecPos;{g m=1;ce++;do{REV_BIT_VAR(F,ce,m)
+}bK(--cQ);ce-=m;}}U{cQ-=ci;do{NORMALIZE
+Q >>= 1;{g t;fx-=Q;t=(0-((g)fx >> 31));ce=(ce << 1)+ (t+1);fx+=Q&t;}}bK(--cQ);F=A+Align;ce <<= ci;{f i=1;REV_BIT_CONST(F,i,1)
+REV_BIT_CONST(F,i,2)
+REV_BIT_CONST(F,i,4)
+REV_BIT_LAST (F,i,8)
+ce |= i;}if(ce==(g)0xFFFFFFFF){H=cp;E-=bi;bL;}}}rep3=rep2;rep2=rep1;rep1=rep0;rep0=ce+1;E=(E<bi+dX)? dX:dX+3;if(ce >= (cn==0 ? bh:cn)){H+=cI+kMatchMinLen;bL;}}H+=kMatchMinLen;{y gm;f curLen;y bG;if((gm=ct-bC)== 0){bL;}curLen=((gm<H)? (f)gm:H);bG=bC-rep0+(bC<rep0 ? cz:0);bh+=(g)curLen;H-=curLen;if(curLen<=cz-bG){Z *gu=dic+bC;dm hh=(dm)bG-(dm)bC;z Z *lim=gu+curLen;bC+=(y)curLen;do
+*(gu)= (Z)*(gu+hh);bK(++gu!=lim);}U{do{dic[bC++]=dic[bG];if(++bG==cz)
+bG=0;}bK(--curLen!=0);}}}}bK(bC<ct&&eR<fN);NORMALIZE
+p->eR=eR;p->Q=Q;p->fx=fx;p->cA=(g)H;p->bC=bC;p->bh=bh;p->ba[0]=rep0;p->ba[1]=rep1;p->ba[2]=rep2;p->ba[3]=rep3;p->E=(g)E;if(H >= cI)
+u dy;u cy;}J D LzmaDec_WriteRem(ez *p,y ct){f H=(f)p->cA;if(H==0)
+u;{y bC=p->bC;Z *dic;y cz;y rep0;{y gm=ct-bC;if(gm<H){H=(f)(gm);if(H==0)
+u;}}if(p->cn==0&&p->prop.fw-p->bh<=H)
+p->cn=p->prop.fw;p->bh+=(g)H;p->cA-=(g)H;dic=p->dic;rep0=p->ba[0];cz=p->cz;do{dic[bC]=dic[bC-rep0+(bC<rep0 ? cz:0)];bC++;}bK(--H);p->bC=bC;}}
+#define kRange0 0xFFFFFFFF
+#define kBound0 ((kRange0 >> bl)<< (bl-1))
+#define kBadRepCode (kBound0+(((kRange0-kBound0)>> bl)<< (bl-1)))
+J L hE(ez *p,y ct,z Z *fN){if(p->cn==0){g gm=p->prop.fw-p->bh;if(ct-p->bC > gm)
+ct=p->bC+gm;}{L du=LzmaDec_DecodeReal_3(p,ct,fN);if(p->cn==0&&p->bh >= p->prop.fw)
+p->cn=p->prop.fw;u du;}}dN enum{hg,DUMMY_LIT,DUMMY_MATCH,DUMMY_REP
+}ELzmaDummy;
+#define eG(hi)((hi)== DUMMY_MATCH)
+J ELzmaDummy LzmaDec_TryDummy(z ez *p,z Z *eR,z Z **bufOut){g Q=p->Q;g fx=p->fx;z Z *fN=*bufOut;z G *A=GET_PROBS;f E=(f)p->E;ELzmaDummy du;cr(;;){z G *F;g bound;f he;f P=CALC_POS_STATE(p->bh,((f)1 << p->prop.pb)- 1);F=A+IsMatch+eL;em(F){cD
+F=A+Literal;if(p->cn!=0||p->bh!=0)
+F+=((g)LZMA_LIT_SIZE *
+((((p->bh)&(((f)1 << (p->prop.lp))- 1))<< p->prop.lc)+
+((f)p->dic[(p->bC==0 ? p->cz:p->bC)- 1] >> (8-p->prop.lc))));if(E<dX){f fj=1;do{GET_BIT_(F+fj,fj)}bK(fj<0x100);}U{f bu=p->dic[p->bC-p->ba[0] +
+(p->bC<p->ba[0] ? p->cz:0)];f dO=0x100;f fj=1;do{f cu;z G *probLit;bu+=bu;cu=dO;dO&= bu;probLit=F+(dO+cu+fj);GET_BIT2_(probLit,fj,dO^=cu;,;)
+}bK(fj<0x100);}du=DUMMY_LIT;}U{f H;cE
+F=A+IsRep+E;em(F){cD
+E=0;F=A+LenCoder;du=DUMMY_MATCH;}U{cE
+du=DUMMY_REP;F=A+IsRepG0+E;em(F){cD
+F=A+IsRep0Long+eL;em(F){cD
+bL;}U{cE
+}}U{cE
+F=A+IsRepG1+E;em(F){cD
+}U{cE
+F=A+IsRepG2+E;em(F){cD
+}U{cE
+}}}E=bi;F=A+RepLenCoder;}{f ct,cx;z G *cj=F+LenChoice;em(cj){cD
+cj=F+LenLow+gK;cx=0;ct=1 << bM;}U{cE
+cj=F+LenChoice2;em(cj){cD
+cj=F+LenLow+gK+(1 << bM);cx=R;ct=1 << bM;}U{cE
+cj=F+LenHigh;cx=R * 2;ct=1 << dq;}}TREE_DECODE_(cj,ct,H)
+H+=cx;}if(E<4){f cY;F=A+PosSlot +
+((H<W-1 ? H:W-1)<<
+bo);TREE_DECODE_(F,1 << bo,cY)
+if(cY >= dA){f cQ=((cY >> 1)- 1);if(cY<cC){F=A+SpecPos+((2 | (cY&1))<< cQ);}U{cQ-=ci;do{hf
+Q >>= 1;fx-=Q&(((fx-Q)>> 31)- 1);}bK(--cQ);F=A+Align;cQ=ci;}{f i=1;f m=1;do{REV_BIT_(F,i,m)
+}bK(--cQ);}}}}bL;}hf
+*bufOut=eR;u du;}D LzmaDec_InitDicAndState(ez *p,L initDic,L initState){p->cA=cp+1;p->bU=0;if(initDic){p->bh=0;p->cn=0;p->cA=cp+2;}if(initState)
+p->cA=cp+2;}D LzmaDec_Init(ez *p){p->bC=0;LzmaDec_InitDicAndState(p,1,1);}
+#define di *fl=fT;u dy;
+L LzmaDec_DecodeToDic(ez *p,y dicLimit,z Z *hh,y *cM,ELzmaFinishMode finishMode,ELzmaStatus *fl){y et=*cM;(*cM)= 0;*fl=fy;if(p->cA > cp){if(p->cA > cp+2)
+u p->cA==fU ? SZ_ERROR_FAIL:dy;cr(;et > 0&&p->bU<RC_INIT_SIZE;(*cM)++,et--)
+p->eh[p->bU++]=*hh++;if(p->bU!=0&&p->eh[0]!=0)
+u dy;if(p->bU<RC_INIT_SIZE){*fl=cK;u cy;}p->fx=((g)p->eh[1] << 24)
+| ((g)p->eh[2] << 16)
+| ((g)p->eh[3] << 8)
+| ((g)p->eh[4]);if(p->cn==0
+&&p->bh==0
+&&p->fx >= kBadRepCode)
+u dy;p->Q=0xFFFFFFFF;p->bU=0;if(p->cA > cp+1){y gt=gJ(&p->prop);y i;G *A=p->A;cr(i=0;i<gt;i++)
+A[i]=bV >> 1;p->ba[0]=p->ba[1]=p->ba[2]=p->ba[3]=1;p->E=0;}p->cA=0;}cr(;;){if(p->cA==cp){if(p->fx!=0)
+u dy;*fl=gX;u cy;}LzmaDec_WriteRem(p,dicLimit);{L eA=0;if(p->bC >= dicLimit){if(p->cA==0&&p->fx==0){*fl=fg;u cy;}if(finishMode==LZMA_FINISH_ANY){*fl=fT;u cy;}if(p->cA!=0){di
+}eA=1;}if(p->bU==0){z Z *fN;L bF=-1;if(et<bq||eA){z Z *bufOut=hh+et;ELzmaDummy hi=LzmaDec_TryDummy(p,hh,&bufOut);if(hi==hg){y i;if(et >= bq)
+bL;(*cM)+= et;p->bU=(f)et;cr(i=0;i<et;i++)
+p->eh[i]=hh[i];*fl=cK;u cy;}bF=(L)(bufOut-hh);if((f)bF > bq)
+bL;if(eA&&!eG(hi)){f i;(*cM)+= (f)bF;p->bU=(f)bF;cr(i=0;i<(f)bF;i++)
+p->eh[i]=hh[i];di
+}fN=hh;}U
+fN=hh+et-bq;p->eR=hh;{L du=hE(p,dicLimit,fN);y bR=(y)(p->eR-hh);if(bF<0){if(bR > et)
+bL;}U if((f)bF!=bR)
+bL;hh+=bR;et-=bR;(*cM)+= bR;if(du!=cy){p->cA=cI;u dy;}}fa;}{f gm=p->bU;f ahead=0;L bF=-1;bK(gm<bq&&ahead<et)
+p->eh[gm++]=hh[ahead++];if(gm<bq||eA){z Z *bufOut=p->eh+gm;ELzmaDummy hi=LzmaDec_TryDummy(p,p->eh,&bufOut);if(hi==hg){if(gm >= bq)
+bL;p->bU=gm;(*cM)+= (y)ahead;*fl=cK;u cy;}bF=(L)(bufOut-p->eh);if((f)bF<p->bU)
+bL;if(eA&&!eG(hi)){(*cM)+= (f)bF-p->bU;p->bU=(f)bF;di
+}}p->eR=p->eh;{L du=hE(p,dicLimit,p->eR);y bR=(y)(p->eR-p->eh);gm=p->bU;if(bF<0){if(bR > bq)
+bL;if(bR<gm)
+bL;}U if((f)bF!=bR)
+bL;bR-=gm;hh+=bR;et-=bR;(*cM)+= bR;p->bU=0;if(du!=cy){p->cA=cI;u dy;}}}}}p->cA=fU;u SZ_ERROR_FAIL;}D LzmaDec_FreeProbs(ez *p){free(p->A);p->A=0;}L LzmaProps_Decode(CLzmaProps *p,z Z *V,f cV){g fw;Z d;if(cV<dn)
+u gY;U
+fw=V[1] | ((g)V[2] << 8)|((g)V[3] << 16)|((g)V[4] << 24);if(fw<LZMA_DIC_MIN)
+fw=LZMA_DIC_MIN;p->fw=fw;d=V[0];if(d >= (9 * 5 * 5))
+u gY;p->lc=(Z)(d % 9);d /= 9;p->pb=(Z)(d / 5);p->lp=(Z)(d % 5);u cy;}J L LzmaDec_AllocateProbs2(ez *p,z CLzmaProps *propNew){g gt=gJ(propNew);if(!p->A||gt!=p->gt){LzmaDec_FreeProbs(p);p->A=(G *)SzAlloc(gt * ia(G));if(!p->A)
+u ga;p->probs_1664=p->A+1664;p->gt=gt;}u cy;}L LzmaDec_AllocateProbs(ez *p,z Z *bJ,f gn){CLzmaProps propNew;RINOK(LzmaProps_Decode(&propNew,bJ,gn))
+RINOK(LzmaDec_AllocateProbs2(p,&propNew))
+p->prop=propNew;u cy;}L LzmaDecode(Z *gu,y *eT,z Z *hh,y *cM,z Z *propData,f propSize,ELzmaFinishMode finishMode,ELzmaStatus *fl){ez p;L du;y outSize=*eT,et=*cM;*eT=*cM=0;*fl=fy;if(et<RC_INIT_SIZE)
+u fX;LzmaDec_CONSTRUCT(&p)
+RINOK(LzmaDec_AllocateProbs(&p,propData,propSize))
+p.dic=gu;p.cz=outSize;LzmaDec_Init(&p);*cM=et;du=LzmaDec_DecodeToDic(&p,outSize,hh,cM,finishMode,fl);*eT=p.bC;if(du==cy&&*fl==cK)
+du=fX;LzmaDec_FreeProbs(&p);u du;}bp dY{L fh;g bj;L lc,lp,pb,algo,fb,fE,M;f dL;g mc;f cU;L eH;fI reduceSize,affinity;};bp bk;
+#define hF ((g)15 << 28)
+#define kTopValue ((g)1 << 24)
+#define bl 11
+#define bV (1 << bl)
+#define dT 5
+#define bW (bV >> 1)
+#define by 4
+#define eM 4
+#define REP_LEN_COUNT 64
+D LzmaEncProps_Init(dY *p){p->fh=5;p->bj=p->mc=0;p->reduceSize=(fI)(int64_t)-1;p->lc=p->lp=p->pb=p->algo=p->fb=p->fE=p->M=p->eH=-1;p->dL=0;p->cU=0;p->affinity=0;}D LzmaEncProps_Normalize(dY *p){L fh=p->fh;if(fh<0)fh=5;p->fh=fh;if(p->bj==0)
+p->bj=(f)fh<=4 ?
+(g)1 << (fh * 2+16):(f)fh<=ia(y)/ 2+4 ?
+(g)1 << (fh+20):(g)1 << (ia(y)/ 2+24);if(p->bj > p->reduceSize){g v=(g)p->reduceSize;z g kReduceMin=((g)1 << 12);if(v<kReduceMin)
+v=kReduceMin;if(p->bj > v)
+p->bj=v;}if(p->lc<0)p->lc=3;if(p->lp<0)p->lp=0;if(p->pb<0)p->pb=2;if(p->algo<0)p->algo=(f)fh<5 ? 0:1;if(p->fb<0)p->fb=(f)fh<7 ? 32:64;if(p->fE<0)p->fE=(p->algo==0 ? 0:1);if(p->M<0)p->M=(p->fE ? 4:5);if(p->mc==0)p->mc=(16+((f)p->fb >> 1))>> (p->fE ? 0:1);if(p->eH<0)
+p->eH=1;}
+#define gL (11+ia(y)/ 8 * 3)
+#define kDicLogSizeMaxCompress ((gL-1)* 2+7)
+J D LzmaEnc_FastPosInit(Z *en){f gg;en[0]=0;en[1]=1;en+=2;cr(gg=2;gg<gL * 2;gg++){y k=((y)1 << ((gg >> 1)- 1));y j;cr(j=0;j<k;j++)
+en[j]=(Z)gg;en+=k;}}
+#define BSR2_RET(bG,du){f zz=(bG<(1 << (gL+6)))? 6:6+gL-1;du=p->en[bG >> zz]+(zz * 2);}
+#define GetPosSlot1(bG)p->en[bG]
+#define GetPosSlot2(bG,du){BSR2_RET(bG,du);}
+#define GetPosSlot(bG,du){if(bG<bd)du=p->en[bG&(bd-1)];U BSR2_RET(bG,du);}
+#define bb 4
+dN UInt16 CState;dN UInt16 CExtra;bp eB{g I;CState E,bO;g H,bn,ba[bb];};
+#define hj (1 << 11)
+#define kPackReserve (hj * 8)
+#define W 4
+#define bo 6
+#define kDicLogSizeMax 32
+#define kDistTableSizeMax (kDicLogSizeMax * 2)
+#define ci 4
+#define dV (1 << ci)
+#define kAlignMask (dV-1)
+#define dA 4
+#define cC 14
+#define bd (1 << (cC >> 1))
+#define LZMA_PB_MAX 4
+#define LZMA_LC_MAX 8
+#define LZMA_LP_MAX 4
+#define bI (1 << LZMA_PB_MAX)
+#define bM 3
+#define R (1 << bM)
+#define dq 8
+#define df (1 << dq)
+#define hG (R * 2+df)
+#define dP 2
+#define bB (dP+hG-1)
+#define bi 12
+bp CLenEnc{G low[bI << (bM+1)],high[df];};bp CLenPriceEnc{f tableSize;g eN[bI][hG];};
+#define dB(p,P,H)((p)->eN[P][(y)(H)- dP])
+bp dr{g Q;f cache;fI low,cacheSize;Z *eR,*bufLim,*ch;gC* dM;fI bR;L du;};bp CSaveState{G *dg;f E;g ba[bb];G cT[1 << ci],isRep[bi],isRepG0[bi],isRepG1[bi],isRepG2[bi],fz[bi][bI],gv[bi][bI],eU[W][1 << bo],ik[bd];CLenEnc lenProbs,gM;};bp bk{D *bz;IMatchFinder2 cg;f optCur,optEnd,fO,bg;g bE;f E,ca,cc;g ba[bb];f lpMask,fk;G *dg;dr rc;g eC;f lc,lp,pb,lclp;L fastMode,cU,finished,needInit;fI nowPos64;f hk;L fm;f distTableSize;g bj;L fH;B matchFinderBase;g be[bV >> by],eD[bB * 2+2];g il[dV],bY[W][kDistTableSizeMax],hl[W][bd];G cT[1 << ci],isRep[bi],isRepG0[bi],isRepG1[bi],isRepG2[bi],fz[bi][bI],gv[bi][bI],eU[W][1 << bo],ik[bd];CLenEnc lenProbs,gM;Z en[1 << gL];CLenPriceEnc lenEnc,eO;eB bP[hj];CSaveState hm;};
+#define MFB (p->matchFinderBase)
+L LzmaEnc_SetProps(bk* p,z dY *props2){dY bJ=*props2;LzmaEncProps_Normalize(&bJ);if(bJ.lc > LZMA_LC_MAX
+|| bJ.lp > LZMA_LP_MAX
+|| bJ.pb > LZMA_PB_MAX)
+u hM;if(bJ.bj > hF)
+bJ.bj=hF;{z fI dict64=bJ.bj;if(dict64 > ((fI)1 << kDicLogSizeMaxCompress))
+u hM;}p->bj=bJ.bj;{f fb=(f)bJ.fb;if(fb<5)
+fb=5;if(fb > bB)
+fb=bB;p->ca=fb;}p->lc=(f)bJ.lc;p->lp=(f)bJ.lp;p->pb=(f)bJ.pb;p->fastMode=(bJ.algo==0);MFB.fE=(Z)(bJ.fE ? 1:0);{f M=4;if(bJ.fE){if(bJ.M<2)M=2;U if(bJ.M<4)M=(f)bJ.M;}if(bJ.M >= 5)M=5;MFB.M=M;MFB.dL=(Z)bJ.dL;}MFB.fG=bJ.mc;p->cU=(L)bJ.cU;u cy;}D LzmaEnc_SetDataSize(bk* p,fI expectedDataSiize){MFB.dH=expectedDataSiize;}
+#define kState_Start 0
+#define kState_LitAfterMatch 4
+#define kState_LitAfterRep 5
+#define kState_MatchAfterLit 7
+#define hX 8
+J z Z fY[bi] ={0,0,0,0,1,2,3,4,5,6,4,5};J z Z fn[bi] ={7,7,7,7,7,7,7,10,10,10,10,10};J z Z hO[bi] ={8,8,8,8,8,8,8,11,11,11,11,11};J z Z hH[bi]={9,9,9,9,9,9,9,11,11,11,11,11};
+#define IsLitState(s)((s)< 7)
+#define GetLenToPosState2(H)(((H)< W-1)? (H):W-1)
+#define GetLenToPosState(H)(((H)< W+1)? (H)- 2:W-1)
+#define hP (1 << 30)
+J D RangeEnc_Construct(dr *p){p->dM=0;p->ch=0;}
+#define hQ(p)((y)(p)->bR+(y)((p)->eR-(p)->ch)+ (y)(p)->cacheSize)
+#define RC_BUF_SIZE (1 << 16)
+J L RangeEnc_Alloc(dr *p){if(!p->ch){p->ch=(Z *)SzAlloc(RC_BUF_SIZE);if(!p->ch)
+u 0;p->bufLim=p->ch+RC_BUF_SIZE;}u 1;}J D RangeEnc_Free(dr *p){free(p->ch);p->ch=0;}J D RangeEnc_Init(dr *p){p->Q=0xFFFFFFFF;p->cache=0;p->low=0;p->cacheSize=0;p->eR=p->ch;p->bR=0;p->du=cy;}J D fi(dr *p){z y hz=(y)(p->eR-p->ch);if(p->du==cy){if(hz!=p->dM->Write(p->dM,p->ch,hz))
+p->du=SZ_ERROR_WRITE;}p->bR+=hz;p->eR=p->ch;}J D RangeEnc_ShiftLow(dr *p){g low=(g)p->low;f high=(f)(p->low >> 32);p->low=(g)(low << 8);if(low<(g)0xFF000000||high!=0){{Z *eR=p->eR;*eR++=(Z)(p->cache+high);p->cache=(f)(low >> 24);p->eR=eR;if(eR==p->bufLim)
+fi(p);if(p->cacheSize==0)
+u;}high+=0xFF;cr(;;){Z *eR=p->eR;*eR++=(Z)(high);p->eR=eR;if(eR==p->bufLim)
+fi(p);if(--p->cacheSize==0)
+u;}}p->cacheSize++;}J D RangeEnc_FlushData(dr *p){L i;cr(i=0;i<5;i++)
+RangeEnc_ShiftLow(p);}
+#define RC_NORM(p)if(Q<kTopValue){Q <<= 8;RangeEnc_ShiftLow(p);}
+#define cN(p,F)he=*(F);dI=(Q >> bl)* he;
+#define gN(p,F,cu){g mask;cN(p,F)mask=0-(g)cu;Q&= mask;mask&= dI;Q-=mask;(p)->low+=mask;mask=(g)cu-1;Q+=dI&mask;mask&= (bV-((1 << dT)- 1));mask+=((1 << dT)- 1);he+=(g)((L)(mask-he)>> dT);*(F)= (G)he;RC_NORM(p)}
+#define gO(p,F)Q=dI;*(F)= (G)(he+((bV-he)>> dT));
+#define RC_BIT_1_BASE(p,F)Q-=dI;(p)->low+=dI;*(F)= (G)(he-(he >> dT));
+#define RC_BIT_0(p,F)gO(p,F)RC_NORM(p)
+#define fP(p,F)RC_BIT_1_BASE(p,F)RC_NORM(p)
+J D RangeEnc_EncodeBit_0(dr *p,G *F){g Q,he,dI;Q=p->Q;cN(p,F)
+RC_BIT_0(p,F)
+p->Q=Q;}J D LitEnc_Encode(dr *p,G *A,g cw){g Q=p->Q;cw |= 0x100;do{g he,dI;G *F=A+(cw >> 8);g cu=(cw >> 7)&1;cw <<= 1;gN(p,F,cu)
+}bK(cw<0x10000);p->Q=Q;}J D LitEnc_EncodeMatched(dr *p,G *A,g cw,g bu){g Q=p->Q;g dO=0x100;cw |= 0x100;do{g he,dI;G *F;g cu;bu <<= 1;F=A+(dO+(bu&dO)+ (cw >> 8));cu=(cw >> 7)&1;cw <<= 1;dO&= ~(bu ^ cw);gN(p,F,cu)
+}bK(cw<0x10000);p->Q=Q;}J D LzmaEnc_InitPriceTables(g *be){g i;cr(i=0;i<(bV >> by);i++){z f kCyclesBits=eM;g w=(i << by)+ (1 << (by-1));f bitCount=0;f j;cr(j=0;j<kCyclesBits;j++){w=w * w;bitCount <<= 1;bK(w >= ((g)1 << 16)){w >>= 1;bitCount++;}}be[i]=(g)(((f)bl << kCyclesBits)- 15-bitCount);}}
+#define GET_PRICE(F,cu)p->be[((F)^ (f)(((-(L)(cu)))&(bV-1)))>> by]
+#define cO(F,cu)be[((F)^ (f)((-((L)(cu)))&(bV-1)))>> by]
+#define cZ(F)p->be[(F)>> by]
+#define dv(F)p->be[((F)^ (bV-1))>> by]
+#define eo(F)be[(F)>> by]
+#define ep(F)be[((F)^ (bV-1))>> by]
+J g LitEnc_GetPrice(z G *A,g cw,z g *be){g I=0;cw |= 0x100;do{f cu=cw&1;cw >>= 1;I+=cO(A[cw],cu);}bK(cw >= 2);u I;}J g dw(z G *A,g cw,g bu,z g *be){g I=0;g dO=0x100;cw |= 0x100;do{bu <<= 1;I+=cO(A[dO+(bu&dO)+ (cw >> 8)],(cw >> 7)&1);cw <<= 1;dO&= ~(bu ^ cw);}bK(cw<0x10000);u I;}J D RcTree_ReverseEncode(dr *rc,G *A,f hA,f cw){g Q=rc->Q;f m=1;do{g he,dI;f cu=cw&1;cw >>= 1;gN(rc,A+m,cu)
+m=(m << 1)| cu;}bK(--hA);rc->Q=Q;}J D LenEnc_Init(CLenEnc *p){f i;cr(i=0;i<(bI << (bM+1));i++)
+p->low[i]=bW;cr(i=0;i<df;i++)
+p->high[i]=bW;}J D LenEnc_Encode(CLenEnc *p,dr *rc,f cw,f P){g Q,he,dI;G *A=p->low;Q=rc->Q;cN(rc,A)
+if(cw >= R){fP(rc,A)
+A+=R;cN(rc,A)
+if(cw >= R * 2){fP(rc,A)
+rc->Q=Q;LitEnc_Encode(rc,p->high,cw-R * 2);u;}cw-=R;}{f m;f cu;RC_BIT_0(rc,A)
+A+=(P << (1+bM));cu=(cw >> 2);gN(rc,A+1,cu)m=(1 << 1)+ cu;cu=(cw >> 1)&1;gN(rc,A+m,cu)m=(m << 1)+ cu;cu=cw&1;gN(rc,A+m,cu)
+rc->Q=Q;}}J D SetPrices_3(z G *A,g startPrice,g *eN,z g *be){f i;cr(i=0;i<8;i+=2){g I=startPrice;g F;I+=cO(A[1 ],(i >> 2));I+=cO(A[2+(i >> 2)],(i >> 1)&1);F=A[4+(i >> 1)];eN[i ]=I+eo(F);eN[i+1]=I+ep(F);}}J D dk(
+CLenPriceEnc *p,f numPosStates,z CLenEnc *enc,z g *be){g b;{f F=enc->low[0];g a,c;f P;b=ep(F);a=eo(F);c=b+eo(enc->low[R]);cr(P=0;P<numPosStates;P++){g *eN=p->eN[P];z G *A=enc->low+(P << (1+bM));SetPrices_3(A,a,eN,be);SetPrices_3(A+R,c,eN+R,be);}}{f i=p->tableSize;if(i > R * 2){z G *A=enc->high;g *eN=p->eN[0]+R * 2;i-=R * 2-1;i >>= 1;b+=ep(enc->low[R]);do{f cw=--i+(1 << (dq-1));g I=b;do{z f cu=cw&1;cw >>= 1;I+=cO(A[cw],cu);}bK(cw >= 2);{z f F=A[(y)i+(1 << (dq-1))];eN[(y)i * 2 ]=I+eo(F);eN[(y)i * 2+1]=I+ep(F);}}bK(i);{f P;z y hz=(p->tableSize-R * 2)* ia(p->eN[0][0]);cr(P=1;P<numPosStates;P++)
+memcpy(p->eN[P]+R * 2,p->eN[0]+R * 2,hz);}}}}
+#define eb(p,hz){p->cc+=(hz);p->cg.Skip(p->bz,(g)(hz));}
+J f dQ(bk *p,f *numPairsRes){f bg;p->cc++;p->bE=p->cg.dl(p->bz);{z g *d=p->cg.ft(p->bz,p->eD);bg=(f)(d-p->eD);}*numPairsRes=bg;if(bg==0)
+u 0;{z f H=p->eD[(y)bg-2];if(H!=p->ca)
+u H;{g bE=p->bE;if(bE > bB)
+bE=bB;{z Z *p1=p->cg.bH(p->bz)- 1;z Z *p2=p1+H;z dm dif=(dm)-1-(dm)p->eD[(y)bg-1];z Z *lim=p1+bE;cr(;p2!=lim&&*p2==p2[dif];p2++){}u(f)(p2-p1);}}}}
+#define hn ((g)(L)-1)
+#define MakeAs_Lit(p){(p)->bn=hn;(p)->bO=0;}
+#define MakeAs_ShortRep(p){(p)->bn=0;(p)->bO=0;}
+#define IsShortRep(p)((p)->bn==0)
+#define GetPrice_ShortRep(p,E,P)(cZ(p->isRepG0[E])+ cZ(p->gv[E][P]))
+#define hR(p,E,P)(dv(p->fz[E][P])+ dv(p->gv[E][P]))+ dv(p->isRep[E])+ cZ(p->isRepG0[E])
+J g GetPrice_PureRep(z bk *p,f ds,y E,y P){g I;g F=p->isRepG0[E];if(ds==0){I=cZ(F);I+=dv(p->gv[E][P]);}U{I=dv(F);F=p->isRepG1[E];if(ds==1)
+I+=cZ(F);U{I+=dv(F);I+=GET_PRICE(p->isRepG2[E],ds-2);}}u I;}J f Backward(bk *p,f bv){f wr=bv+1;p->optEnd=wr;cr(;;){g bn=p->bP[bv].bn;f H=(f)p->bP[bv].H;f bO=(f)p->bP[bv].bO;bv-=H;if(bO){wr--;p->bP[wr].H=(g)H;bv-=bO;H=bO;if(bO==1){p->bP[wr].bn=bn;bn=hn;}U{p->bP[wr].bn=0;H--;wr--;p->bP[wr].bn=hn;p->bP[wr].H=1;}}if(bv==0){p->eC=bn;p->optCur=wr;u H;}wr--;p->bP[wr].bn=bn;p->bP[wr].H=(g)H;}}
+#define LIT_PROBS(bG,prevByte)(p->dg+(g)3 * (((((bG)<< 8)+ (prevByte))&p->lpMask)<< p->lc))
+J f GetOptimum(bk *p,g dJ){f gP,bv;g ba[bb];f gQ[bb];g *eD;{g bE;f bg,bD,eP,i,P;g fA,dC;z Z *V;Z da,bu;p->optCur=p->optEnd=0;if(p->cc==0)
+bD=dQ(p,&bg);U{bD=p->fO;bg=p->bg;}bE=p->bE;if(bE<2){p->eC=hn;u 1;}if(bE > bB)
+bE=bB;V=p->cg.bH(p->bz)- 1;eP=0;cr(i=0;i<bb;i++){f H;z Z *db;ba[i]=p->ba[i];db=V-ba[i];if(V[0]!=db[0]||V[1]!=db[1]){gQ[i]=0;fa;}cr(H=2;H<bE&&V[H]==db[H];H++){}gQ[i]=H;if(H > gQ[eP])
+eP=i;if(H==bB)
+bL;}if(gQ[eP] >= p->ca){f H;p->eC=(g)eP;H=gQ[eP];eb(p,H-1)
+u H;}eD=p->eD;
+#define gh eD
+if(bD >= p->ca){p->eC=gh[(y)bg-1]+bb;eb(p,bD-1)
+u bD;}da=*V;bu=*(V-ba[0]);gP=gQ[eP];if(gP<=bD)
+gP=bD;if(gP<2&&da!=bu){p->eC=hn;u 1;}p->bP[0].E=(CState)p->E;P=(dJ&p->fk);{z G *A=LIT_PROBS(dJ,*(V-1));p->bP[1].I=cZ(p->fz[p->E][P])+
+(!IsLitState(p->E)?
+dw(A,da,bu,p->be):LitEnc_GetPrice(A,da,p->be));}MakeAs_Lit(&p->bP[1])
+fA=dv(p->fz[p->E][P]);dC=fA+dv(p->isRep[p->E]);if(bu==da&&gQ[0]==0){g fB=dC+GetPrice_ShortRep(p,p->E,P);if(fB<p->bP[1].I){p->bP[1].I=fB;MakeAs_ShortRep(&p->bP[1])
+}if(gP<2){p->eC=p->bP[1].bn;u 1;}}p->bP[1].H=1;p->bP[0].ba[0]=ba[0];p->bP[0].ba[1]=ba[1];p->bP[0].ba[2]=ba[2];p->bP[0].ba[3]=ba[3];cr(i=0;i<bb;i++){f eQ=gQ[i];g I;if(eQ<2)
+fa;I=dC+GetPrice_PureRep(p,i,p->E,P);do{g dK=I+dB(&p->eO,P,eQ);eB *bP =&p->bP[eQ];if(dK<bP->I){bP->I=dK;bP->H=(g)eQ;bP->bn=(g)i;bP->bO=0;}}bK(--eQ >= 2);}{f H=gQ[0]+1;if(H<=bD){f dO=0;g gR=fA+cZ(p->isRep[p->E]);if(H<2)
+H=2;U
+bK(H > gh[dO])
+dO+=2;cr(;;H++){eB *bP;g bn=gh[(y)dO+1];g I=gR+dB(&p->lenEnc,P,H);f lenToPosState=GetLenToPosState(H);if(bn<bd)
+I+=p->hl[lenToPosState][bn&(bd-1)];U{f gg;GetPosSlot2(bn,gg)
+I+=p->il[bn&kAlignMask];I+=p->bY[lenToPosState][gg];}bP =&p->bP[H];if(I<bP->I){bP->I=I;bP->H=(g)H;bP->bn=bn+bb;bP->bO=0;}if(H==gh[dO]){dO+=2;if(dO==bg)
+bL;}}}}bv=0;}cr(;;){f bE;g co;f im,bg,prev,E,P,startLen;g gw,fA,dC;L nextIsLit;Z da,bu;z Z *V;eB *fo,*ei;if(++bv==gP)
+bL;if(bv >= hj-64){f j,best;g I=p->bP[bv].I;best=bv;cr(j=bv+1;j<=gP;j++){g dK=p->bP[j].I;if(I >= dK){I=dK;best=j;}}{f dW=best-bv;if(dW!=0){eb(p,dW)
+}}bv=best;bL;}im=dQ(p,&bg);if(im >= p->ca){p->bg=bg;p->fO=im;bL;}fo =&p->bP[bv];dJ++;prev=bv-fo->H;if(fo->H==1){E=(f)p->bP[prev].E;if(IsShortRep(fo))
+E=hH[E];U
+E=fY[E];}U{z eB *eV;g b0;g bn=fo->bn;if(fo->bO){prev-=(f)fo->bO;E=hX;if(fo->bO==1)
+E=(bn<bb ? hX:kState_MatchAfterLit);}U{E=(f)p->bP[prev].E;if(bn<bb)
+E=hO[E];U
+E=fn[E];}eV =&p->bP[prev];b0=eV->ba[0];if(bn<bb){if(bn==0){ba[0]=b0;ba[1]=eV->ba[1];ba[2]=eV->ba[2];ba[3]=eV->ba[3];}U{ba[1]=b0;b0=eV->ba[1];if(bn==1){ba[0]=b0;ba[2]=eV->ba[2];ba[3]=eV->ba[3];}U{ba[2]=b0;ba[0]=eV->ba[bn];ba[3]=eV->ba[bn ^ 1];}}}U{ba[0]=(bn-bb+1);ba[1]=b0;ba[2]=eV->ba[1];ba[3]=eV->ba[2];}}fo->E=(CState)E;fo->ba[0]=ba[0];fo->ba[1]=ba[1];fo->ba[2]=ba[2];fo->ba[3]=ba[3];V=p->cg.bH(p->bz)- 1;da=*V;bu=*(V-ba[0]);P=(dJ&p->fk);{g curPrice=fo->I;f F=p->fz[E][P];fA=curPrice+dv(F);gw=curPrice+cZ(F);}ei =&p->bP[(y)bv+1];nextIsLit=0;if((ei->I<hP
+&&bu==da)
+|| gw > ei->I
+)
+gw=0;U{z G *A=LIT_PROBS(dJ,*(V-1));gw+=(!IsLitState(E)?
+dw(A,da,bu,p->be):LitEnc_GetPrice(A,da,p->be));if(gw<ei->I){ei->I=gw;ei->H=1;MakeAs_Lit(ei)
+nextIsLit=1;}}dC=fA+dv(p->isRep[E]);co=p->bE;{f hV=hj-1-bv;if(co > hV)
+co=(g)hV;}if(IsLitState(E))
+if(bu==da)
+if(dC<ei->I)
+if(
+ei->H<2
+|| (ei->bn!=0
+)){g fB=dC+GetPrice_ShortRep(p,E,P);if(fB<ei->I){ei->I=fB;ei->H=1;MakeAs_ShortRep(ei)
+nextIsLit=0;}}if(co<2)
+fa;bE=(co<=p->ca ? co:p->ca);if(!nextIsLit
+&&gw!=0
+&&bu!=da
+&&co > 2){z Z *db=V-ba[0];if(V[1]==db[1]&&V[2]==db[2]){f H;f ct=p->ca+1;if(ct > co)
+ct=co;cr(H=3;H<ct&&V[H]==db[H];H++){}{f in=fY[E];f dd=(dJ+1)&p->fk;g I=gw+hR(p,in,dd);{f cx=bv+H;if(gP<cx)
+gP=cx;{g dK;eB *bP;H--;dK=I+dB(&p->eO,dd,H);bP =&p->bP[cx];if(dK<bP->I){bP->I=dK;bP->H=(g)H;bP->bn=0;bP->bO=1;}}}}}}startLen=2;{f ds=0;cr(;ds<bb;ds++){f H;g I;z Z *db=V-ba[ds];if(V[0]!=db[0]||V[1]!=db[1])
+fa;cr(H=2;H<bE&&V[H]==db[H];H++){}{f cx=bv+H;if(gP<cx)
+gP=cx;}{f dh=H;I=dC+GetPrice_PureRep(p,ds,E,P);do{g dK=I+dB(&p->eO,P,dh);eB *bP =&p->bP[bv+dh];if(dK<bP->I){bP->I=dK;bP->H=(g)dh;bP->bn=(g)ds;bP->bO=0;}}bK(--dh >= 2);}if(ds==0)startLen=H+1;{f dh=H+1;f ct=dh+p->ca;if(ct > co)
+ct=co;dh+=2;if(dh<=ct)
+if(V[dh-2]==db[dh-2])
+if(V[dh-1]==db[dh-1]){f in=hO[E];f dd=(dJ+H)&p->fk;I+=dB(&p->eO,P,H)
++ cZ(p->fz[in][dd])
++ dw(LIT_PROBS(dJ+H,V[(y)H-1]),V[H],db[H],p->be);in=kState_LitAfterRep;dd=(dd+1)&p->fk;I+=hR(p,in,dd);cr(;dh<ct&&V[dh]==db[dh];dh++){}dh-=H;{{f cx=bv+H+dh;if(gP<cx)
+gP=cx;{g dK;eB *bP;dh--;dK=I+dB(&p->eO,dd,dh);bP =&p->bP[cx];if(dK<bP->I){bP->I=dK;bP->H=(g)dh;bP->bO=(CExtra)(H+1);bP->bn=(g)ds;}}}}}}}}if(im > bE){im=bE;cr(bg=0;im > gh[bg];bg+=2);gh[bg]=(g)im;bg+=2;}if(im >= startLen){g gR=fA+cZ(p->isRep[E]);g bn;f dO,cY,H;{f cx=bv+im;if(gP<cx)
+gP=cx;}dO=0;bK(startLen > gh[dO])
+dO+=2;bn=gh[(y)dO+1];GetPosSlot2(bn,cY)
+cr(H=startLen;;H++){g I=gR+dB(&p->lenEnc,P,H);{eB *bP;f lenNorm=H-2;lenNorm=GetLenToPosState2(lenNorm);if(bn<bd)
+I+=p->hl[lenNorm][bn&(bd-1)];U
+I+=p->bY[lenNorm][cY]+p->il[bn&kAlignMask];bP =&p->bP[bv+H];if(I<bP->I){bP->I=I;bP->H=(g)H;bP->bn=bn+bb;bP->bO=0;}}if(H==gh[dO]){z Z *db=V-bn-1;f dh=H+1;f ct=dh+p->ca;if(ct > co)
+ct=co;dh+=2;if(dh<=ct)
+if(V[dh-2]==db[dh-2])
+if(V[dh-1]==db[dh-1]){cr(;dh<ct&&V[dh]==db[dh];dh++){}dh-=H;{f in=fn[E];f dd=(dJ+H)&p->fk;f cx;I+=cZ(p->fz[in][dd]);I+=dw(LIT_PROBS(dJ+H,V[(y)H-1]),V[H],db[H],p->be);in=kState_LitAfterMatch;dd=(dd+1)&p->fk;I+=hR(p,in,dd);cx=bv+H+dh;if(gP<cx)
+gP=cx;{g dK;eB *bP;dh--;dK=I+dB(&p->eO,dd,dh);bP =&p->bP[cx];if(dK<bP->I){bP->I=dK;bP->H=(g)dh;bP->bO=(CExtra)(H+1);bP->bn=bn+bb;}}}}dO+=2;if(dO==bg)
+bL;bn=gh[(y)dO+1];GetPosSlot2(bn,cY)
+}}}}do
+p->bP[gP].I=hP;bK(--gP);u Backward(p,bv);}
+#define ChangePair(smallDist,bigDist)(((bigDist)>> 7)>(smallDist))
+J f GetOptimumFast(bk *p){g bE,eE;f bD,bg,ds,eQ,i;z Z *V;if(p->cc==0)
+bD=dQ(p,&bg);U{bD=p->fO;bg=p->bg;}bE=p->bE;p->eC=hn;if(bE<2)
+u 1;if(bE > bB)
+bE=bB;V=p->cg.bH(p->bz)- 1;eQ=ds=0;cr(i=0;i<bb;i++){f H;z Z *db=V-p->ba[i];if(V[0]!=db[0]||V[1]!=db[1])
+fa;cr(H=2;H<bE&&V[H]==db[H];H++){}if(H >= p->ca){p->eC=(g)i;eb(p,H-1)
+u H;}if(H > eQ){ds=i;eQ=H;}}if(bD >= p->ca){p->eC=p->eD[(y)bg-1]+bb;eb(p,bD-1)
+u bD;}eE=0;if(bD >= 2){eE=p->eD[(y)bg-1];bK(bg > 2){g dist2;if(bD!=p->eD[(y)bg-4]+1)
+bL;dist2=p->eD[(y)bg-3];if(!ChangePair(dist2,eE))
+bL;bg-=2;bD--;eE=dist2;}if(bD==2&&eE >= 0x80)
+bD=1;}if(eQ >= 2)
+if(eQ+1 >= bD
+|| (eQ+2 >= bD&&eE >= (1 << 9))
+|| (eQ+3 >= bD&&eE >= (1 << 15))){p->eC=(g)ds;eb(p,eQ-1)
+u eQ;}if(bD<2||bE<=2)
+u 1;{f len1=dQ(p,&p->bg);p->fO=len1;if(len1 >= 2){g newDist=p->eD[(y)p->bg-1];if((len1 >= bD&&newDist<eE)
+|| (len1==bD+1&&!ChangePair(eE,newDist))
+|| (len1 > bD+1)
+|| (len1+1 >= bD&&bD >= 3&&ChangePair(newDist,eE)))
+u 1;}}V=p->cg.bH(p->bz)- 1;cr(i=0;i<bb;i++){f H,ct;z Z *db=V-p->ba[i];if(V[0]!=db[0]||V[1]!=db[1])
+fa;ct=bD-1;cr(H=2;;H++){if(H >= ct)
+u 1;if(V[H]!=db[H])
+bL;}}p->eC=eE+bb;if(bD!=2){eb(p,bD-2)
+}u bD;}J D WriteEndMarker(bk *p,f P){g Q;Q=p->rc.Q;{g he,dI;G *F =&p->fz[p->E][P];cN(&p->rc,F)
+fP(&p->rc,F)
+F =&p->isRep[p->E];cN(&p->rc,F)
+RC_BIT_0(&p->rc,F)
+}p->E=fn[p->E];p->rc.Q=Q;LenEnc_Encode(&p->lenProbs,&p->rc,0,P);Q=p->rc.Q;{G *A=p->eU[0];f m=1;do{g he,dI;cN(p,A+m)
+fP(&p->rc,A+m)
+m=(m << 1)+ 1;}bK(m<(1 << bo));}{f hA=30-ci;do{Q >>= 1;p->rc.low+=Q;RC_NORM(&p->rc)
+}bK(--hA);}{G *A=p->cT;f m=1;do{g he,dI;cN(p,A+m)
+fP(&p->rc,A+m)
+m=(m << 1)+ 1;}bK(m<dV);}p->rc.Q=Q;}J L CheckErrors(bk *p){if(p->fH!=cy)
+u p->fH;if(p->rc.du!=cy)
+p->fH=SZ_ERROR_WRITE;if(MFB.fH!=cy)
+p->fH=8;if(p->fH!=cy)
+p->finished=1;u p->fH;}J L Flush(bk *p,g nowPos){p->finished=1;if(p->cU)
+WriteEndMarker(p,nowPos&p->fk);RangeEnc_FlushData(&p->rc);fi(&p->rc);u CheckErrors(p);}J D FillAlignPrices(bk *p){f i;z g *be=p->be;z G *A=p->cT;cr(i=0;i<dV / 2;i++){g I=0;f cw=i;f m=1;f cu;g F;cu=cw&1;cw >>= 1;I+=cO(A[m],cu);m=(m << 1)+ cu;cu=cw&1;cw >>= 1;I+=cO(A[m],cu);m=(m << 1)+ cu;cu=cw&1;cw >>= 1;I+=cO(A[m],cu);m=(m << 1)+ cu;F=A[m];p->il[i ]=I+eo(F);p->il[i+8]=I+ep(F);}}J D hI(bk *p){g tempPrices[bd];f i,lps;z g *be=p->be;p->hk=0;cr(i=dA / 2;i<bd / 2;i++){f cY=GetPosSlot1(i);f eI=(cY >> 1)- 1;f base=((2 | (cY&1))<< eI);z G *A=p->ik+(y)base * 2;g I=0;f m=1;f cw=i;f cx=(f)1 << eI;base+=i;if(eI)
+do{f cu=cw&1;cw >>= 1;I+=cO(A[m],cu);m=(m << 1)+ cu;}bK(--eI);{f F=A[m];tempPrices[base ]=I+eo(F);tempPrices[base+cx]=I+ep(F);}}cr(lps=0;lps<W;lps++){f gg;f distTableSize2=(p->distTableSize+1)>> 1;g *bY=p->bY[lps];z G *A=p->eU[lps];cr(gg=0;gg<distTableSize2;gg++){g I;f cu;f cw=gg+(1 << (bo-1));f F;cu=cw&1;cw >>= 1;I=cO(A[cw],cu);cu=cw&1;cw >>= 1;I+=cO(A[cw],cu);cu=cw&1;cw >>= 1;I+=cO(A[cw],cu);cu=cw&1;cw >>= 1;I+=cO(A[cw],cu);cu=cw&1;cw >>= 1;I+=cO(A[cw],cu);F=A[(y)gg+(1 << (bo-1))];bY[(y)gg * 2 ]=I+eo(F);bY[(y)gg * 2+1]=I+ep(F);}{g dW=((g)((cC / 2-1)- ci)<< eM);cr(gg=cC / 2;gg<distTableSize2;gg++){bY[(y)gg * 2 ]+=dW;bY[(y)gg * 2+1]+=dW;dW+=((g)1 << eM);}}{g *dp=p->hl[lps];dp[0]=bY[0];dp[1]=bY[1];dp[2]=bY[2];dp[3]=bY[3];cr(i=4;i<bd;i+=2){g slotPrice=bY[GetPosSlot1(i)];dp[i ]=slotPrice+tempPrices[i];dp[i+1]=slotPrice+tempPrices[i+1];}}}}J D LzmaEnc_Construct(bk *p){RangeEnc_Construct(&p->rc);MatchFinder_Construct(&MFB);{dY bJ;LzmaEncProps_Init(&bJ);LzmaEnc_SetProps((bk*)(D *)p,&bJ);}LzmaEnc_FastPosInit(p->en);LzmaEnc_InitPriceTables(p->be);p->dg=0;p->hm.dg=0;}bk* LzmaEnc_Create(){D *p;p=SzAlloc(ia(bk));if(p)
+LzmaEnc_Construct((bk *)p);u(bk*)p;}J D gS(bk *p){free(p->dg);free(p->hm.dg);p->dg=0;p->hm.dg=0;}J D LzmaEnc_Destruct(bk *p){MatchFinder_Free(&MFB);gS(p);RangeEnc_Free(&p->rc);}D LzmaEnc_Destroy(bk* p){LzmaEnc_Destruct(p);free(p);}J L LzmaEnc_CodeOneBlock(bk *p,g maxPackSize,g maxUnpackSize){g ec,startPos32;if(p->needInit){p->cg.Init(p->bz);p->needInit=0;}if(p->finished)
+u p->fH;RINOK(CheckErrors(p))
+ec=(g)p->nowPos64;startPos32=ec;if(p->nowPos64==0){f bg;Z da;if(p->cg.dl(p->bz)== 0)
+u Flush(p,ec);dQ(p,&bg);RangeEnc_EncodeBit_0(&p->rc,&p->fz[kState_Start][0]);da=*(p->cg.bH(p->bz)- p->cc);LitEnc_Encode(&p->rc,p->dg,da);p->cc--;ec++;}if(p->cg.dl(p->bz)!= 0)
+cr(;;){g bn;f H,P;g Q,he,dI;G *A;if(p->fastMode)
+H=GetOptimumFast(p);U{f oci=p->optCur;if(p->optEnd==oci)
+H=GetOptimum(p,ec);U{z eB *bP =&p->bP[oci];H=bP->H;p->eC=bP->bn;p->optCur=oci+1;}}P=(f)ec&p->fk;Q=p->rc.Q;A =&p->fz[p->E][P];cN(&p->rc,A)
+bn=p->eC;if(bn==hn){Z da;z Z *V;f E;RC_BIT_0(&p->rc,A)
+p->rc.Q=Q;V=p->cg.bH(p->bz)- p->cc;A=LIT_PROBS(ec,*(V-1));da=*V;E=p->E;p->E=fY[E];if(IsLitState(E))
+LitEnc_Encode(&p->rc,A,da);U
+LitEnc_EncodeMatched(&p->rc,A,da,*(V-p->ba[0]));}U{fP(&p->rc,A)
+A =&p->isRep[p->E];cN(&p->rc,A)
+if(bn<bb){fP(&p->rc,A)
+A =&p->isRepG0[p->E];cN(&p->rc,A)
+if(bn==0){RC_BIT_0(&p->rc,A)
+A =&p->gv[p->E][P];cN(&p->rc,A)
+if(H!=1){RC_BIT_1_BASE(&p->rc,A)
+}U{gO(&p->rc,A)
+p->E=hH[p->E];}}U{fP(&p->rc,A)
+A =&p->isRepG1[p->E];cN(&p->rc,A)
+if(bn==1){gO(&p->rc,A)
+bn=p->ba[1];}U{fP(&p->rc,A)
+A =&p->isRepG2[p->E];cN(&p->rc,A)
+if(bn==2){gO(&p->rc,A)
+bn=p->ba[2];}U{RC_BIT_1_BASE(&p->rc,A)
+bn=p->ba[3];p->ba[3]=p->ba[2];}p->ba[2]=p->ba[1];}p->ba[1]=p->ba[0];p->ba[0]=bn;}RC_NORM(&p->rc)
+p->rc.Q=Q;if(H!=1){LenEnc_Encode(&p->gM,&p->rc,H-dP,P);--p->fm;p->E=hO[p->E];}}U{f cY;RC_BIT_0(&p->rc,A)
+p->rc.Q=Q;p->E=fn[p->E];LenEnc_Encode(&p->lenProbs,&p->rc,H-dP,P);bn-=bb;p->ba[3]=p->ba[2];p->ba[2]=p->ba[1];p->ba[1]=p->ba[0];p->ba[0]=bn+1;p->hk++;GetPosSlot(bn,cY){g cw=(g)cY+(1 << bo);Q=p->rc.Q;A=p->eU[GetLenToPosState(H)];do{G *F=A+(cw >> bo);g cu=(cw >> (bo-1))&1;cw <<= 1;gN(&p->rc,F,cu)
+}bK(cw<(1 << bo * 2));p->rc.Q=Q;}if(bn >= dA){f eI=((cY >> 1)- 1);if(bn<bd){f base=((2 | (cY&1))<< eI);RcTree_ReverseEncode(&p->rc,p->ik+base,eI,(f)(bn));}U{g pos2=(bn | 0xF)<< (32-eI);Q=p->rc.Q;do{Q >>= 1;p->rc.low+=Q&(0-(pos2 >> 31));pos2+=pos2;RC_NORM(&p->rc)
+}bK(pos2!=0xF0000000);{f m=1;f cu;cu=bn&1;bn >>= 1;gN(&p->rc,p->cT+m,cu)m=(m << 1)+ cu;cu=bn&1;bn >>= 1;gN(&p->rc,p->cT+m,cu)m=(m << 1)+ cu;cu=bn&1;bn >>= 1;gN(&p->rc,p->cT+m,cu)m=(m << 1)+ cu;cu=bn&1;gN(&p->rc,p->cT+m,cu)
+p->rc.Q=Q;}}}}}ec+=(g)H;p->cc-=H;if(p->cc==0){g bR;if(!p->fastMode){if(p->hk >= 64){FillAlignPrices(p);hI(p);dk(&p->lenEnc,(f)1 << p->pb,&p->lenProbs,p->be);}if(p->fm<=0){p->fm=REP_LEN_COUNT;dk(&p->eO,(f)1 << p->pb,&p->gM,p->be);}}if(p->cg.dl(p->bz)== 0)
+bL;bR=ec-startPos32;if(maxPackSize){if(bR+hj+300 >= maxUnpackSize
+|| hQ(&p->rc)+ kPackReserve >= maxPackSize)
+bL;}U if(bR >= (1 << 17)){p->nowPos64+=ec-startPos32;u CheckErrors(p);}}}p->nowPos64+=ec-startPos32;u Flush(p,ec);}
+#define kBigHashDicLimit ((g)1 << 24)
+J L LzmaEnc_Alloc(bk *p,g ed){g beforeSize=hj;g bj;if(!RangeEnc_Alloc(&p->rc))
+u ga;{z f lclp=p->lc+p->lp;if(!p->dg||!p->hm.dg||p->lclp!=lclp){gS(p);p->dg=(G *)SzAlloc(((y)0x300 * ia(G))<< lclp);p->hm.dg=(G *)SzAlloc(((y)0x300 * ia(G))<< lclp);if(!p->dg||!p->hm.dg){gS(p);u ga;}p->lclp=lclp;}}MFB.bigHash=(Z)(p->bj > kBigHashDicLimit ? 1:0);bj=p->bj;if(bj==((g)2 << 30)||
+bj==((g)3 << 30)){bj-=1;}if(beforeSize+bj<ed)
+beforeSize=ed-bj;{if(!MatchFinder_Create(&MFB,bj,beforeSize,p->ca,bB+1))
+u ga;p->bz =&MFB;MatchFinder_CreateVTable(&MFB,&p->cg);}u cy;}J D LzmaEnc_Init(bk *p){f i;p->E=0;p->ba[0]=p->ba[1]=p->ba[2]=p->ba[3]=1;RangeEnc_Init(&p->rc);cr(i=0;i<(1 << ci);i++)
+p->cT[i]=bW;cr(i=0;i<bi;i++){f j;cr(j=0;j<bI;j++){p->fz[i][j]=bW;p->gv[i][j]=bW;}p->isRep[i]=bW;p->isRepG0[i]=bW;p->isRepG1[i]=bW;p->isRepG2[i]=bW;}{cr(i=0;i<W;i++){G *A=p->eU[i];f j;cr(j=0;j<(1 << bo);j++)
+A[j]=bW;}}{cr(i=0;i<bd;i++)
+p->ik[i]=bW;}{z y hz=(y)0x300 << (p->lp+p->lc);y k;G *A=p->dg;cr(k=0;k<hz;k++)
+A[k]=bW;}LenEnc_Init(&p->lenProbs);LenEnc_Init(&p->gM);p->optEnd=0;p->optCur=0;{cr(i=0;i<hj;i++)
+p->bP[i].I=hP;}p->cc=0;p->fk=((f)1 << p->pb)- 1;p->lpMask=((g)0x100 << p->lp)- ((f)0x100 >> p->lc);}J D LzmaEnc_InitPrices(bk *p){if(!p->fastMode){hI(p);FillAlignPrices(p);}p->lenEnc.tableSize=p->eO.tableSize=p->ca+1-dP;p->fm=REP_LEN_COUNT;dk(&p->lenEnc,(f)1 << p->pb,&p->lenProbs,p->be);dk(&p->eO,(f)1 << p->pb,&p->gM,p->be);}J L LzmaEnc_AllocAndInit(bk *p,g ed){f i;cr(i=cC / 2;i<kDicLogSizeMax;i++)
+if(p->bj<=((g)1 << i))
+bL;p->distTableSize=i * 2;p->finished=0;p->fH=cy;p->nowPos64=0;p->needInit=1;RINOK(LzmaEnc_Alloc(p,ed))
+LzmaEnc_Init(p);LzmaEnc_InitPrices(p);u cy;}L LzmaEnc_MemPrepare(bk* p,z Z *hh,y cM,g ed){gx(&MFB,hh,cM)
+LzmaEnc_SetDataSize(p,cM);u LzmaEnc_AllocAndInit(p,ed);}D LzmaEnc_Finish(bk* p){UNUSED_VAR(p)
+}dN bp{gC vt;Z *V;y gm;L overflow;}fV;J y SeqOutStreamBuf_Write(gC* pp,z D *V,y cV){gb(pp,fV,vt,p)
+if(p->gm<cV){cV=p->gm;p->overflow=1;}if(cV!=0){memcpy(p->V,V,cV);p->gm-=cV;p->V+=cV;}u cV;}J L LzmaEnc_Encode2(bk *p){L du=cy;cr(;;){du=LzmaEnc_CodeOneBlock(p,0,0);if(du!=cy||p->finished)
+bL;}LzmaEnc_Finish((bk*)(D *)p);u du;}L LzmaEnc_WriteProperties(bk* p,Z *bJ,y *cV){if(*cV<dn)
+u hM;*cV=dn;{z g bj=p->bj;g v;bJ[0]=(Z)((p->pb * 5+p->lp)* 9+p->lc);if(bj >= ((g)1 << 21)){z g kDictMask=((g)1 << 20)- 1;v=(bj+kDictMask)&~kDictMask;if(v<bj)
+v=bj;}U{f i=11 * 2;do{v=(g)(2+(i&1))<< (i >> 1);i++;}bK(v<bj);}SetUi32(bJ+1,v)
+u cy;}}L LzmaEnc_MemEncode(bk* p,Z *gu,y *eT,z Z *hh,y cM,L cU){L du;fV dM;dM.vt.Write=SeqOutStreamBuf_Write;dM.V=gu;dM.gm=*eT;dM.overflow=0;p->cU=cU;p->rc.dM =&dM.vt;du=LzmaEnc_MemPrepare(p,hh,cM,0);if(du==cy){du=LzmaEnc_Encode2(p);if(du==cy&&p->nowPos64!=cM)
+du=SZ_ERROR_FAIL;}*eT-=(y)dM.gm;if(dM.overflow)
+u 7;u du;}L LzmaEncode(Z *gu,y *eT,z Z *hh,y cM,z dY *bJ,Z *propsEncoded,y *gn,L cU){bk* p=LzmaEnc_Create();L du;if(!p)
+u ga;du=LzmaEnc_SetProps(p,bJ);if(du==cy){du=LzmaEnc_WriteProperties(p,propsEncoded,gn);if(du==cy)
+du=LzmaEnc_MemEncode(p,gu,eT,hh,cM,cU);}LzmaEnc_Destroy(p);u du;}L LzmaCompress(f gq*gu,y *eT,z f gq*hh,y cM,f gq*outProps,y *outPropsSize,L fh,f bj,L lc,L lp,L pb,L fb,L eH
+){dY bJ;LzmaEncProps_Init(&bJ);bJ.fh=fh;bJ.bj=bj;bJ.lc=lc;bJ.lp=lp;bJ.pb=pb;bJ.fb=fb;bJ.eH=eH;u LzmaEncode(gu,eT,hh,cM,&bJ,outProps,outPropsSize,0);}L LzmaUncompress(f gq*gu,y *eT,z f gq*hh,y *cM,z f gq*bJ,y gn){ELzmaStatus fl;u LzmaDecode(gu,eT,hh,cM,bJ,(f)gn,LZMA_FINISH_ANY,&fl);}namespace sz{td::dx compress(td::Slice V){bT cV=V.cV();y ho=1 << 22;bT gu=new f gq[ho];f gq outProps[dn] ={};y outPropsSize=dn;L fh=9;f bj=1<<20;L lc=8;L lp=0;L pb=0;L fb=273;L eH=1;L du=LzmaCompress(gu,&ho,(f gq*)V.V(),cV,outProps,&outPropsSize,fh,bj,lc,lp,pb,fb,eH);(du==cy);u td::dx((gq*)gu,ho);}td::dx decompress(td::Slice V){bT cV=V.cV();y ho=1 << 22;bT gu=new f gq[ho];f gq bJ[dn] ={0x8,0,0,0,0x80
+};y gn=dn;L du=LzmaUncompress(gu,&ho,(f gq*)V.V(),&cV,bJ,gn);(du==cy||du==fX);u td::dx((gq*)gu,ho);}}td::dx serialize_boc_opt(ostream&out,Ref<Cell> cell){(!cell.is_null());BagOfCells boc;boc.add_root(cell);(boc.import_cells().is_ok());bT cV=boc.estimate_serialized_size(0);td::dx bs{cV};bT eq=(f gq*)bs.V();boc_writers::BufferWriter fQ{eq,eq+cV};vector<L> backrefs(boc.cell_list_.cV(),0);cr(L i=0;i<boc.cell_count;++i){z bT&cell=boc.cell_list_[i];cr(L j=0;j<cell.ref_num;++j){backrefs[cell.gT[j]]+=1;}}bT ej=fQ.hp;bT hu=[&](gi label){if(ej<fQ.hp){out << label << ":" << td::ConstBitPtr{ej}.to_hex((fQ.hp-ej)* 8)<< endl;ej=fQ.hp;}};bT store_byte=[&](f long long ew){fQ.store_uint(ew,1);};bT bm=[&](f long long ew){fQ.store_uint(ew,boc.info.ref_byte_size);};bT overwrite_ref=[&](L dJ,f long long ew){bT ptr=fQ.hp;fQ.hp=fQ.store_start+dJ;bm(ew);fQ.hp=ptr;};store_byte(boc.info.ref_byte_size);hu("ref-cV");bm(0);hu("cell-hz");vector<L> idx_to_ref(boc.cell_list_.cV(),-1);vector<hW<L,y>> refs_to_set;function<D(L,z vm::BagOfCells::CellInfo&)> store_cell;store_cell=[&](L idx,z vm::BagOfCells::CellInfo&dc_info){f gq eR[256] ={};z Ref<DataCell>&dc=dc_info.dc_ref;L mask=0;cr(f j=0;j<dc_info.ref_num;++j){L gT=dc_info.gT[j];L br=backrefs.at(gT);if(br==1){mask |= (1 << j);}}L s=dc->serialize(eR,256,false);eR[0]=(eR[0]&15)+ mask * 16;fQ.store_bytes(eR,s);hu("V");cr(f j=0;j<dc_info.ref_num;++j){L gT=dc_info.gT[j];L br=backrefs.at(gT);(br > 0);if(br==1){store_cell(gT,boc.cell_list_[gT]);}U{refs_to_set.emplace_back(gT,fQ.dJ());bm(0);hu("ref");}}};L cells_cnt=0;cr(L i=0;i<boc.cell_count;++i){L k=boc.cell_count-1-i;z bT&dc_info=boc.cell_list_[k];L br=backrefs.at(k);if(br!=1){store_cell(k,dc_info);idx_to_ref[k]=cells_cnt++;}}overwrite_ref(1,cells_cnt);cr(z bT&p:refs_to_set){overwrite_ref(p.second,idx_to_ref[p.first]);}bs.truncate(fQ.dJ());u bs;}bp DeserializedCell{bool special;L bits;gi V;vector<hW<L,L>> refs{};};Ref<Cell> deserialize_boc_opt(ostream&out,td::Slice V){(!V.empty());L start=0;bT ej=0;bT hw=[&](gi label){if(ej<start){out << label << ":" << td::ConstBitPtr{(z f gq*)V.V()+ ej}.to_hex((start-ej)* 8)<< endl;ej=start;}};bT read_byte=[&](){(V.cV()> start);u(f gq)V[start++];};bT read_int=[&](L bytes){f long long du=0;bK(bytes > 0){du=(du << 8)+ read_byte();--bytes;}u du;};bT read_bytes=[&](L bytes){gi bs(bytes,0);cr(L i=0;i<bytes;++i){bs.at(i)= read_byte();}u bs;};bT ref_byte_size=(L)read_byte();hw("ref-cV");bT read_ref=[&](){u read_int(ref_byte_size);};bT cell_num=read_ref();hw("cell-hz");vector<DeserializedCell> ek;vector<array<hW<L,L>,4>> cells_refs;vector<L> ref_to_cd_idx(cell_num);function<D(L)> read_cell;read_cell=[&](L idx){bT d1=read_byte();bT d2=read_byte();bT ref_num=d1&7;bT special=(d1&8)> 0;bT mask=(d1 >> 4)&15;bT bytes=(d2+1)>> 1;bT V=read_bytes(bytes);hw("V");bT bits=bytes * 8;if(V.cV()> 0&&(d2&1)){f gq last_byte=V[V.cV()- 1];L fR=8;bK(fR&&(last_byte&1)== 0){fR--;last_byte >>= 1;}if(fR){last_byte=(last_byte&254)<< (8-fR);fR--;}V[V.cV()- 1]=last_byte;bits-=(8-fR);}if(idx!=-1){ref_to_cd_idx.at(idx)= ek.cV();}ek.push_back(DeserializedCell{special,bits,V,});L dc_idx=ek.cV()- 1;cr(L i=0;i<ref_num;++i){bool is_embedded=(mask >> i)&1;if(is_embedded){ek.at(dc_idx).refs.push_back({ek.cV(),-1});read_cell(-1);}U{ek.at(dc_idx).refs.push_back({-1,read_ref()});hw("ref");}}};cr(L i=0;i<cell_num;++i){read_cell(i);}vector<Ref<Cell>> cells(ek.cV());cr(L i=ek.cV()- 1;i >= 0;--i){bT&cd=ek[i];N cb;cb.store_bits(cd.V.V(),cd.bits);cr(z bT&ref:cd.refs){L idx=ref.first;if(idx==-1){(ref.second!=-1);idx=ref_to_cd_idx.at(ref.second);}bT&cell=cells.at(idx);(!cell.is_null());cb.bm(cell);}cells[i]=cb.finalize(cd.special);}u std::move(cells[0]);}td::dx do_compress(td::Slice V){u sz::compress(V);}td::dx do_decompress(td::Slice V){u sz::decompress(V);}td::dx compress(td::Slice V){NullStream ofs;Ref<Cell> block_root=std_boc_deserialize(V).move_as_ok();FullBlock block;q load_std_ctx{ofs};block.bw(load_std_ctx,block_root,0,true);q pack_opt_ctx{ofs};bT opt_block_cell=block.cP(pack_opt_ctx);bT opt_ser=serialize_boc_opt(ofs,opt_block_cell);bT compressed=do_compress(opt_ser);u compressed;}td::dx decompress(td::Slice V){NullStream ofs;bT decompressed=do_decompress(V);bT opt_deser=deserialize_boc_opt(ofs,decompressed);FullBlock opt_block;q parse_opt_ctx{ofs};opt_block.ck(parse_opt_ctx,opt_deser,0,true);q pack_std_ctx{ofs};bT un_opt_block_cell=opt_block.bt(pack_std_ctx);bT boc=std_boc_serialize(un_opt_block_cell,31).move_as_ok();u boc;}L main(
+){gi mode;cin >> mode;gi base64_data;cin >> base64_data;td::dx V(td::base64_decode(base64_data));V=(mode=="compress")? compress(V):decompress(V);cout << td::str_base64_encode(V)<< endl;}

@@ -19,6 +19,10 @@
 #include "td/utils/lz4.h"
 #include "td/utils/misc.h"
 #include "td/utils/buffer.h"
+#include<errno.h>
+#include<stddef.h>
+#include<string.h>
+#include<stdint.h>
 
 #define private public
 #define final
@@ -2182,8 +2186,7 @@ public:
     NullStream() : ostream( &m_nb ) {}
 };
 
-// #include "zpaq_impl_2.cpp"
-#include "zpaq_impl.cpp"
+#include "7z_impl.cpp"
 
 
 td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
@@ -2426,13 +2429,11 @@ Ref<Cell> deserialize_boc_opt(ostream& out, td::Slice data) {
 }
 
 td::BufferSlice do_compress(td::Slice data) {
-	// return td::lz4_compress(data);
-	return zpaq::compress(data);
+	return sz::compress(data);
 }
 
 td::BufferSlice do_decompress(td::Slice data) {
-	// return td::lz4_decompress(data, 10'000'000).move_as_ok();
-	return zpaq::decompress(data);
+	return sz::decompress(data);
 }
 
 td::BufferSlice compress(td::Slice data) {
@@ -2447,7 +2448,6 @@ td::BufferSlice compress(td::Slice data) {
 	ParseContext pack_opt_ctx{ofs};
 	auto opt_block_cell = block.make_opt_cell(pack_opt_ctx);
 
-	// auto opt_ser = std_boc_serialize(opt_block_cell).move_as_ok();
 	auto opt_ser = serialize_boc_opt(ofs, opt_block_cell);
 	auto compressed = do_compress(opt_ser);
 
@@ -2458,7 +2458,6 @@ td::BufferSlice decompress(td::Slice data) {
 	NullStream ofs;
 
 	auto decompressed = do_decompress(data);
-	// auto opt_deser = std_boc_deserialize(decompressed, false, true).move_as_ok();
 	auto opt_deser = deserialize_boc_opt(ofs, decompressed);
 
 	FullBlock opt_block;

@@ -89,6 +89,19 @@
     "iterator": "cpp",
     "random": "cpp",
     "matrixfunctions": "cpp",
-    "polynomials": "cpp"
+    "polynomials": "cpp",
+    "lzmalib.c": "cpp",
+    "lzmadec.c": "cpp",
+    "lzma86enc.c": "cpp",
+    "lzfindmt.c": "cpp",
+    "lzfindopt.c": "cpp",
+    "threads.c": "cpp",
+    "7zcrcopt.c": "cpp",
+    "lzma86dec.c": "cpp",
+    "alloc.c": "cpp",
+    "bra86.c": "cpp",
+    "cpuarch.c": "cpp",
+    "lzfind.c": "cpp",
+    "lzmaenc.c": "cpp"
   }
 }

@@ -44,6 +44,9 @@ keywords = {
     "continue",
     "else",
     "false",
+    "typedef",
+    "for",
+    "sizeof",
 }
 
 requires_define = {
@@ -79,10 +82,17 @@ requires_define = {
     "store_ptr",
     "McBlockExtra",
     "HashmapAugNode",
+    "ptrdiff_t",
+    "position",
+    "uint64_t",
+    "ShardAccountBlocks",
+    "pair",
+    "gen",
 }
 
 cannot_be_replaced = {
     "define",
+    "defined",
     "block",
     "compress",
     "decompress",
@@ -160,7 +170,7 @@ def replace_tokens(code, n):
 
     last_replacement_n = -1
     for token in tokens_to_replace:
-        if len(token) <= 3:
+        if len(token) <= 2:
             continue
         last_replacement_n = find_replacement(last_replacement_n + 1)
         replacement = n_to_token(last_replacement_n)
@@ -174,8 +184,16 @@ def minify_cpp(source_code):
     with open("zpaq_impl.cpp", 'r') as f:
         zpaq_code = f.read()
     
+    with open("zpaq_impl_2.cpp", 'r') as f:
+        zpaq_code_2 = f.read()
+
+    with open("7z_impl.cpp", 'r') as f:
+        z7_code = f.read()
+
     # load zpaq
-    source_code = source_code.replace('#include "zpaq_impl.cpp"', zpaq_code)
+    # source_code = source_code.replace('#include "zpaq_impl.cpp"', zpaq_code)
+    # source_code = source_code.replace('#include "zpaq_impl_2.cpp"', zpaq_code_2)
+    source_code = source_code.replace('#include "7z_impl.cpp"', z7_code)
 
     # remove disabled code
     source_code = apply_minify_remove_rules(source_code)
@@ -188,12 +206,14 @@ def minify_cpp(source_code):
 
     source_code = re.sub(r'\bstatic_cast<(.+)>', r'(\g<1>)', source_code)
 
+    # return source_code
+
+    # return source_code
     # Remove leading and trailing whitespaces from each line
     lines = [line.strip() for line in source_code.splitlines()]
     lines = [x for x in lines if x]
-    lines = [x if x.endswith(';') or x.endswith(',') or x.endswith("{") or x == "}" else x + '\n' for x in lines]
+    lines = [x if not x.startswith('#') and (x.endswith(';') or x.endswith(',') or x.endswith("{") or x == "}") else x + '\n' for x in lines]
     lines = ['\n' + x if x.startswith('#') else x for x in lines]
-
 
     def replace_exhaust(s1, s2):
         nonlocal res
@@ -222,6 +242,7 @@ def minify_cpp(source_code):
     replace_exhaust(" + ", "+")
     replace_exhaust("template <", "template<")
     replace_exhaust(" == ", "==")
+    replace_exhaust(" != ", "!=")
     replace_exhaust(" &", "&")
     replace_exhaust("& ", "&")
     replace_exhaust(" : ", ":")
@@ -264,16 +285,15 @@ def minify_cpp(source_code):
     replace_exhaust("I *", "I*")
     replace_exhaust("char *", "char*")
 
-
     replace_exhaust("{}\n", "{}")
     replace_exhaust(";(\n", ";(")
     replace_exhaust("}(\n", "}(")
     replace_exhaust("\n\n", "\n")
 
-    res = re.sub(r'\bE\([^)]*\);', 'E(0);', res)
+    # res = re.sub(r'\bE\([^)]*\);', 'E(0);', res)
     res = re.sub(r'(?<!\*)(\s+\=\s+)', '=', res)
 
-    res = replace_tokens(res, 150)
+    res = replace_tokens(res, 400)
 
     return res
 

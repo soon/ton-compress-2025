@@ -78,6 +78,7 @@ for i, test_file in enumerate(test_files):
 
     points = 1000 * (2 * original_size) / (original_size + compressed_size)
     print(f"{Fore.GREEN}OK{Style.RESET_ALL} {Fore.CYAN}{points:9.3f}{Fore.CYAN}")
+    # print(f"{Fore.YELLOW}SK{Style.RESET_ALL} {Fore.CYAN}{points:9.3f}{Fore.CYAN}")
     n_ok += 1
     total_points += points
 

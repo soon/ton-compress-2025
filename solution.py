@@ -64,7 +64,7 @@ def compress_zpaq(data):
               input_file.write(decoded_data)
 
           # Run zpaq to add the file to an archive
-          subprocess.run(["zpaq", "a", archive_path, input_file_path, "-m4"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+          subprocess.run(["zpaq", "a", archive_path, input_file_path, "-m3"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
           # Read the compressed archive data
           with open(archive_path, "rb") as archive_file:

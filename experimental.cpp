@@ -1,23 +1,11 @@
 // minify-remove:start
 #define FIXED_FLOAT(x) fixed <<setprecision(2)<<(x)
 // minify-remove:end
-#define private public
-#define final
 
 #include <iostream>
 #include <sstream>
-#include "block/block-auto.h"
-#include "block/block-parse.h"
-#include "common/util.h"
-#include "vm/boc.h"
-#include "vm/cells/CellSlice.h"
 #include <fstream>
 #include <set>
-#include "td/utils/lz4.h"
-#include "td/utils/misc.h"
-#include "td/utils/buffer.h"
-#include "td/utils/misc.h"
-#include "crypto/vm/boc-writers.h"
 #include <stdio.h>
 #include <string>
 #include <vector>
@@ -26,6 +14,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
+#include "common/util.h"
+#include "vm/cells/CellSlice.h"
+#include "td/utils/lz4.h"
+#include "td/utils/misc.h"
+#include "td/utils/buffer.h"
+#include<errno.h>
+#include<stddef.h>
+#include<string.h>
+#include<stdint.h>
+
+#define private public
+#define final
+#include "block/block-auto.h"
+#include "block/block-parse.h"
+#include "vm/boc.h"
+#include "crypto/vm/boc-writers.h"
 
 using namespace vm;
 using namespace std;
@@ -1646,6 +1650,8 @@ struct FullShardFees : BaseFullCell<block::gen::ShardFees> {
 //     FullMcBlockExtra_aux() : BaseFullCell("McBlockExtra_aux", block::gen::t_McBlockExtra_aux) {}
 // };
 
+const block::gen::ShardHashes tSH;
+
 struct FullMcBlockExtra : BaseFullCell<block::gen::McBlockExtra> {
 	/*
 
@@ -1669,28 +1675,28 @@ FullMcBlockExtra() : BaseFullCell("McBlockExtra") {}
 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
 		CHECK(cs.fetch_ulong(16) == 0xcca5);
 		CHECK(cs.fetch_bool_to(record.key_block)); 
-		CHECK(block::gen::t_ShardHashes.fetch_to(cs, record.shard_hashes));
+		CHECK(tSH.fetch_to(cs, record.shard_hashes));
 		shard_fees.unpack_std(ctx, cs, indent + 1);
 		fetch_remaining(cs);
 	}
 
 	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
 		cb.store_long(record.key_block, 1);
-		block::gen::t_ShardHashes.store_from(cb, record.shard_hashes);
+		tSH.store_from(cb, record.shard_hashes);
 		shard_fees.pack_opt(ctx, cb, indent + 1);
 		append_remaining(cb);
 	}
 
 	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
 		CHECK(cs.fetch_bool_to(record.key_block)); 
-		CHECK(block::gen::t_ShardHashes.fetch_to(cs, record.shard_hashes));
+		CHECK(tSH.fetch_to(cs, record.shard_hashes));
 		shard_fees.unpack_opt(ctx, cs, indent + 1);
 		fetch_remaining(cs);
 	}
 
 	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
 		cb.store_long(0xcca5, 16).store_long(record.key_block, 1);
-		block::gen::t_ShardHashes.store_from(cb, record.shard_hashes);
+		tSH.store_from(cb, record.shard_hashes);
 		shard_fees.pack_std(ctx, cb, indent + 1);
 		append_remaining(cb);
 	}
@@ -2180,8 +2186,7 @@ public:
     NullStream() : ostream( &m_nb ) {}
 };
 
-// #include "zpaq_impl_2.cpp"
-#include "zpaq_impl.cpp"
+#include "7z_impl.cpp"
 
 
 td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
@@ -2196,7 +2201,7 @@ td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
 	boc_writers::BufferWriter writer{buffer, buffer + size};
 
 	// calc backrefs to the cell
-	std::vector<int> backrefs(boc.cell_list_.size(), 0);
+	vector<int> backrefs(boc.cell_list_.size(), 0);
 	for (int i = 0; i < boc.cell_count; ++i) {
     const auto& cell = boc.cell_list_[i];
 		for (int j = 0; j < cell.ref_num; ++j) {
@@ -2230,7 +2235,7 @@ td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
 	vector<int> idx_to_ref(boc.cell_list_.size(), -1);
 	vector<pair<int, size_t>> refs_to_set;
 
-	std::function<void(int, const vm::BagOfCells::CellInfo&)> store_cell;
+	function<void(int, const vm::BagOfCells::CellInfo&)> store_cell;
 	store_cell = [&](int idx, const vm::BagOfCells::CellInfo& dc_info) { 
 		unsigned char buf[256] = {};
     const Ref<DataCell>& dc = dc_info.dc_ref;
@@ -2343,7 +2348,7 @@ Ref<Cell> deserialize_boc_opt(ostream& out, td::Slice data) {
 	vector<array<pair<int, int>, 4>> cells_refs;
 	vector<int> ref_to_cd_idx(cell_num);
 
-	std::function<void(int)> read_cell;
+	function<void(int)> read_cell;
 	read_cell = [&](int idx) { 
 		auto d1 = read_byte();
 		auto d2 = read_byte();
@@ -2424,13 +2429,11 @@ Ref<Cell> deserialize_boc_opt(ostream& out, td::Slice data) {
 }
 
 td::BufferSlice do_compress(td::Slice data) {
-	// return td::lz4_compress(data);
-	return zpaq::compress(data);
+	return sz::compress(data);
 }
 
 td::BufferSlice do_decompress(td::Slice data) {
-	// return td::lz4_decompress(data, 10'000'000).move_as_ok();
-	return zpaq::decompress(data);
+	return sz::decompress(data);
 }
 
 td::BufferSlice compress(td::Slice data) {
@@ -2445,7 +2448,6 @@ td::BufferSlice compress(td::Slice data) {
 	ParseContext pack_opt_ctx{ofs};
 	auto opt_block_cell = block.make_opt_cell(pack_opt_ctx);
 
-	// auto opt_ser = std_boc_serialize(opt_block_cell).move_as_ok();
 	auto opt_ser = serialize_boc_opt(ofs, opt_block_cell);
 	auto compressed = do_compress(opt_ser);
 
@@ -2456,7 +2458,6 @@ td::BufferSlice decompress(td::Slice data) {
 	NullStream ofs;
 
 	auto decompressed = do_decompress(data);
-	// auto opt_deser = std_boc_deserialize(decompressed, false, true).move_as_ok();
 	auto opt_deser = deserialize_boc_opt(ofs, decompressed);
 
 	FullBlock opt_block;
