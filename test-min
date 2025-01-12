@@ -3,6 +3,6 @@ set -xe
 rm -f ./executable ./solution.min.cpp
 ./minify.py
 ./compile.sh solution.min.cpp executable
-python ./run_tests.py
+python ./run_tests.py $1
 wc solution.min.cpp
 ./count_tokens.py

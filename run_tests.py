@@ -4,6 +4,7 @@ import os
 import subprocess
 from typing import Optional
 from colorama import Fore, Style, init
+import sys
 
 
 def get_base64_size(s: str) -> Optional[int]:
@@ -16,7 +17,9 @@ def get_base64_size(s: str) -> Optional[int]:
 
 init(autoreset=True)
 
-test_files = os.listdir("tests/")
+folder = sys.argv[1] if len(sys.argv) > 1 else "tests"
+
+test_files = os.listdir(f"{folder}/")
 test_files.sort()
 n_tests = len(test_files)
 if n_tests == 0:
@@ -33,7 +36,7 @@ print(f"{Fore.YELLOW}Idx  {'Name':<{name_width}} {'Size':>7}   Compression   Dec
 
 for i, test_file in enumerate(test_files):
     i += 1
-    with open("tests/" + test_file, "r") as f:
+    with open(f"{folder}/" + test_file, "r") as f:
         original_block = f.read().split()[1]
     original_size = get_base64_size(original_block)
     assert original_size is not None

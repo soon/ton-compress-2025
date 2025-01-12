@@ -39,7 +39,7 @@ async def fetch_url(seqno):
             print(f"An error occurred: {e}")
 
 async def main():
-    seqnos = [random.randint(1, 43339277) for _ in range(100)]
+    seqnos = range(43888281 - 100, 43888281)
     tasks = []
     semaphore = asyncio.Semaphore(10)  # Limit to 10 concurrent tasks
 
