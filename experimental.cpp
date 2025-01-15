@@ -58,6 +58,8 @@ set<string> enabled_optimizations{
 	// "ShardStateUnsplit_aux",
 
 	"Maybe",
+	"ValueFlow",
+	"BlockInfo",
 };
 
 CellSlice to_cs(Ref<Cell> cell)
@@ -1375,29 +1377,29 @@ struct FullShardAccountBlocks : BaseFullCell<block::gen::ShardAccountBlocks> {
 //     FullShardStateUnsplit_aux() : BaseFullCell("ShardStateUnsplit_aux") {}
 // };
 
-struct MyMcStateExtra : block::gen::McStateExtra {
-  bool skip(vm::CellSlice& cs) const override {
-		return cs.advance(16)
-      && block::gen::ShardHashes().skip(cs)
-      && cs.advance_ext(0x100, 2)
-      && tCC.skip(cs);
-	}
-};
+// struct MyMcStateExtra : block::gen::McStateExtra {
+//   bool skip(vm::CellSlice& cs) const override {
+// 		return cs.advance(16)
+//       && block::gen::ShardHashes().skip(cs)
+//       && cs.advance_ext(0x100, 2)
+//       && tCC.skip(cs);
+// 	}
+// };
 
-struct FullMcStateExtra : BaseFullCell<MyMcStateExtra> {
-    FullMcStateExtra() : BaseFullCell("McStateExtra", MyMcStateExtra()) {}
-};
+// struct FullMcStateExtra : BaseFullCell<MyMcStateExtra> {
+//     FullMcStateExtra() : BaseFullCell("McStateExtra", MyMcStateExtra()) {}
+// };
 
-const block::gen::ShardStateUnsplit_aux tSSUa;
-const block::gen::RefT tRMSE{MyMcStateExtra()};
-const block::gen::Maybe tMRMSE{tRMSE};
+// const block::gen::ShardStateUnsplit_aux tSSUa;
+// const block::gen::RefT tRMSE{MyMcStateExtra()};
+// const block::gen::Maybe tMRMSE{tRMSE};
 
-struct MyShardStateUnsplit : block::gen::ShardStateUnsplit {
-	bool skip(vm::CellSlice& cs) const {
-		return cs.advance_ext(0x169, 3)
-				&& tMRMSE.skip(cs);
-	}
-};
+// struct MyShardStateUnsplit : block::gen::ShardStateUnsplit {
+// 	bool skip(vm::CellSlice& cs) const {
+// 		return cs.advance_ext(0x169, 3)
+// 				&& tMRMSE.skip(cs);
+// 	}
+// };
 
 // Disabled as part of merkle update
 // 
@@ -1499,9 +1501,27 @@ struct FullShardState : BaseFullCell<ShardState>, td::CntObject {
 //     FullLibDescr() : BaseFullCell("LibDescr", block::gen::t_LibDescr) {}
 // };
 
-// struct FullBlockInfo : BaseFullCell<block::gen::BlockInfo> {
-//     FullBlockInfo() : BaseFullCell("BlockInfo", block::gen::t_BlockInfo) {}
-// };
+struct FullBlockInfo : BaseFullCell<block::gen::BlockInfo> {
+    FullBlockInfo() : BaseFullCell("BlockInfo") {}
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		cs.advance(32);
+		fetch_remaining(cs);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		append_remaining(cb);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		fetch_remaining(cs);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_long(0x9bc7a987, 32);
+		append_remaining(cb);
+	}
+};
 
 // struct FullBlkPrevInfo : BaseFullCell<block::gen::BlkPrevInfo> {
 //     FullBlkPrevInfo() : BaseFullCell("BlkPrevInfo", block::gen::t_BlkPrevInfo) {}
@@ -1515,9 +1535,31 @@ struct FullShardState : BaseFullCell<ShardState>, td::CntObject {
 //     FullTYPE_1658() : BaseFullCell("TYPE_1658", block::gen::t_TYPE_1658) {}
 // };
 
-// struct FullValueFlow : BaseFullCell<block::gen::ValueFlow> {
-//     FullValueFlow() : BaseFullCell("ValueFlow", block::gen::t_ValueFlow) {}
-// };
+struct FullValueFlow : BaseFullCell<block::gen::ValueFlow> {
+    FullValueFlow() : BaseFullCell("ValueFlow") {}
+
+	unsigned long long tag = -1;
+
+	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = cs.fetch_ulong(32);
+		fetch_remaining(cs);
+	}
+
+	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_long((int)(tag == 0xb8e48dfb), 1);
+		append_remaining(cb);
+	}
+
+	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override {
+		tag = cs.fetch_long(1) ? 0xb8e48dfb : 0x3ebf98b7;
+		fetch_remaining(cs);
+	}
+
+	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override {
+		cb.store_long(tag, 32);
+		append_remaining(cb);
+	}
+};
 
 // struct FullBinTree : BaseFullCell<block::gen::BinTree> {
 //     FullBinTree() : BaseFullCell("BinTree", block::gen::t_BinTree) {}
@@ -2107,8 +2149,9 @@ struct FullBlockExtra : BaseFullCell<block::gen::BlockExtra>
 
 struct FullBlock : BaseFullCell<block::gen::Block>
 {
-	block::gen::Block::Record record;
-
+	int global_id = -1;
+	FullBlockInfo info;
+	FullValueFlow value_flow;
 	FullMERKLE_UPDATE<FullShardState> state_update;
 	FullBlockExtra extra;
 
@@ -2118,10 +2161,12 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 
 	void do_unpack_std(ParseContext& ctx, CellSlice& cs, int indent = 0) override
 	{
-		CHECK(type.unpack(cs, record));
-
-		state_update.cell_unpack_std(ctx, record.state_update, indent + 1);
-		extra.cell_unpack_std(ctx, record.extra, indent + 1, true);
+		CHECK(cs.advance(32));
+		CHECK(cs.fetch_int_to(32, global_id));
+		info.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		value_flow.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		state_update.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
+		extra.cell_unpack_std(ctx, cs.fetch_ref(), indent + 1);
 		// minify-remove
 		CHECK(cs.empty_ext());
 	}
@@ -2129,30 +2174,30 @@ struct FullBlock : BaseFullCell<block::gen::Block>
 	void do_pack_opt(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
 	{
 		// todo store bit (in case of main) or long for id;
-		cb.store_long(record.global_id, 32)
-				.store_ref(record.info)
-				.store_ref(record.value_flow)
+		cb.store_long(global_id, 32)
+				.store_ref(info.make_opt_cell(ctx, indent + 1))
+				.store_ref(value_flow.make_opt_cell(ctx, indent + 1))
 				.store_ref(state_update.make_opt_cell(ctx, indent + 1))
 				.store_ref(extra.make_opt_cell(ctx, indent + 1));
 	}
 
 	void do_unpack_opt(ParseContext& ctx, CellSlice& cs, int indent = 0) override
 	{
-		CHECK(
-			cs.fetch_int_to(32, record.global_id)
-      && cs.fetch_ref_to(record.info)
-      && cs.fetch_ref_to(record.value_flow)
-		);
+		CHECK(cs.fetch_int_to(32, global_id));
+		info.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+		value_flow.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
 		state_update.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
-		extra.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1, true);
+		extra.cell_unpack_opt(ctx, cs.fetch_ref(), indent + 1);
+		// minify-remove
+		CHECK(cs.empty_ext());
 	}
 
 	void do_pack_std(ParseContext& ctx, CellBuilder& cb, int indent = 0) override
 	{
 		cb.store_long(0x11ef55aa, 32)
-				.store_long(record.global_id, 32)
-				.store_ref(record.info)
-				.store_ref(record.value_flow)
+				.store_long(global_id, 32)
+				.store_ref(info.make_std_cell(ctx, indent + 1))
+				.store_ref(value_flow.make_std_cell(ctx, indent + 1))
 				.store_ref(state_update.make_std_cell(ctx, indent + 1))
 				.store_ref(extra.make_std_cell(ctx, indent + 1));
 	}
@@ -2211,14 +2256,32 @@ td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
 
 	auto last_print = writer.store_ptr;
 	auto print_writer = [&](string label) {
+		// minify-remove:start
 		if (last_print < writer.store_ptr) {
 			out << label << ": " << td::ConstBitPtr{last_print}.to_hex((writer.store_ptr - last_print) * 8) << endl;
 			last_print = writer.store_ptr;
 		}
+		// minify-remove:end
 	};
 
+	int expected_cells_cnt = 0;
+  for (int i = 0; i < boc.cell_count; ++i) {
+		int k = boc.cell_count - 1 - i;
+    const auto& dc_info = boc.cell_list_[k];
+		int br = backrefs.at(k);
+
+		if (br != 1) {
+			expected_cells_cnt++;
+		} 
+  }
+
+	int rs = 0;
+	while (expected_cells_cnt >= (1LL << (rs << 3))) {
+    rs++;
+  }
+
 	auto store_byte = [&](unsigned long long value) { writer.store_uint(value, 1); };
-	auto store_ref = [&](unsigned long long value) { writer.store_uint(value, boc.info.ref_byte_size); };
+	auto store_ref = [&](unsigned long long value) { writer.store_uint(value, rs); };
 	auto overwrite_ref = [&](int position, unsigned long long value) { 
 		auto ptr = writer.store_ptr;
 		writer.store_ptr = writer.store_start + position;
@@ -2226,10 +2289,10 @@ td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
 		writer.store_ptr = ptr;
 	};
 
-	store_byte(boc.info.ref_byte_size);
+	store_byte(rs);
 	print_writer("ref-size");
 
-  store_ref(0); // cells count, will overwrite later
+  store_ref(expected_cells_cnt);
 	print_writer("cell-num");
 
 	vector<int> idx_to_ref(boc.cell_list_.size(), -1);
@@ -2283,9 +2346,6 @@ td::BufferSlice serialize_boc_opt(ostream& out, Ref<Cell> cell) {
 			idx_to_ref[k] = cells_cnt++;
 		} 
   }
-
-	// replace cells count
-	overwrite_ref(1, cells_cnt);
 
 	// replace ref placeholders with actual cell ids
 	for (const auto& p: refs_to_set) {
@@ -2503,8 +2563,9 @@ int main(
 
 	// check_decompress();
 
-	ifstream fin(argc > 1 ? argv[1] : "tests/1-001.txt");
+	// ifstream fin(argc > 1 ? argv[1] : "tests/1-001.txt");
 	// ifstream fin(argc > 1 ? argv[1] : "tests/1-006.txt");
+	ifstream fin(argc > 1 ? argv[1] : "tests-blocks/43888181.txt");
 	ofstream fout_source_cells("analysis-01-source-cells.txt");
 	ofstream fout_final_cells("analysis-02-final-cells.txt");
 	ofstream fout_parse_std("analysis-03-parse-std.txt");

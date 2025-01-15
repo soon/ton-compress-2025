@@ -88,6 +88,8 @@ requires_define = {
     "ShardAccountBlocks",
     "pair",
     "gen",
+    "cell_list_",
+    "Ref",
 }
 
 cannot_be_replaced = {
@@ -295,7 +297,7 @@ def minify_cpp(source_code):
 
     res = replace_tokens(res, 400)
 
-    return res
+    return "/* minified, contact for original */\n" + res.strip()
 
 # Example usage
 if __name__ == "__main__":
